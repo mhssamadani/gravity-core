@@ -87,6 +87,31 @@ func NewClient(options ...ErgOptions) (*ErgClient, error) {
 	return c, nil
 }
 
+func GetDataType(ctx context.Context) (uint8, error) {
+	type Result struct {
+		Success bool   `json:"success"`
+		DataType uint8 `json:"dataType"`
+	}
+	client, err := NewClient()
+	if err != nil {
+		return 0, err
+	}
+	url, err := JoinUrl(client.Options.BaseUrl, "adaptor/getDataType")
+	if err != nil {
+		return 0, err
+	}
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
+	result := new(Result)
+	_, err = client.Do(ctx, req, result)
+	if err != nil {
+		return 0, err
+	}
+	if !result.Success {
+		return 0, errors.New("can't get lastRound")
+	}
+	return result.DataType, nil
+}
+
 func (a ErgClient) GetOptions() ErgOptions {
 	return a.Options
 }
