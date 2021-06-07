@@ -3,6 +3,7 @@ package adaptors
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -280,9 +281,12 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	return oraclePubKey
 }
 
-// ValueType TODO: returns datatype from extractor (type of target)
 func (adaptor *ErgoAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
-	panic("implement me")
+	dataType, err := helpers.GetDataType(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return abi.ExtractorType(dataType), nil
 }
 
 func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
@@ -382,7 +386,47 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 }
 
 func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId uint64, value *extractor.Data, ctx context.Context) error {
-	return nil
+	type Tx struct {
+		Success bool   `json:"success"`
+		TxId    string `json:"txId"`
+	}
+
+	dataType, err := helpers.GetDataType(ctx)
+	if err != nil {
+		return err
+	}
+
+	data := make(map[string]interface{})
+	data["PulseId"] = pulseId
+	switch SubType(dataType) {
+	case Int64:
+		data["Value"], err = strconv.ParseInt(value.Value, 10, 64)
+		if err != nil {
+			return err
+		}
+	case String:
+		data["Value"] = value.Value
+	case Bytes:
+		data["Value"], err = base64.StdEncoding.DecodeString(value.Value)
+		if err != nil {
+			return err
+		}
+	}
+	jsonData, err := json.Marshal(data)
+	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/sendValueToSubs")
+	if err != nil {
+		return err
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonData))
+	if err != nil {
+		return  err
+	}
+	tx := new(Tx)
+	_, err = adaptor.ergoClient.Do(ctx, req, tx)
+	if err != nil {
+		return err
+	}
+	return  nil
 }
 
 func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
