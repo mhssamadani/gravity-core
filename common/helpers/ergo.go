@@ -87,10 +87,10 @@ func NewClient(options ...ErgOptions) (*ErgClient, error) {
 	return c, nil
 }
 
-func GetDataType(ctx context.Context) (uint8, error) {
+func GetDataType(ctx context.Context) (int, error) {
 	type Result struct {
 		Success bool   `json:"success"`
-		DataType uint8 `json:"dataType"`
+		DataType int `json:"dataType"`
 	}
 	client, err := NewClient()
 	if err != nil {

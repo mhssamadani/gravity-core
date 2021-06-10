@@ -305,7 +305,7 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	}
 	type Data struct {
 		Signs Sign   `json:"signs"`
-		Hash  []byte `json:"hashData"`
+		Hash  string `json:"hashData"`
 	}
 	type Tx struct {
 		Success bool   `json:"success"`
@@ -321,7 +321,7 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/:"+strconv.FormatUint(pulseId, 10), nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	if err != nil {
 		return "", err
 	}
@@ -367,7 +367,7 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	}
 
 	// Send oracleSigns to be verified by contract in proxy side and get txId
-	data, err := json.Marshal(Data{Signs: Sign{a: signsA, z: signsZ}, Hash: hash})
+	data, err := json.Marshal(Data{Signs: Sign{a: signsA, z: signsZ}, Hash: hex.EncodeToString(hash)})
 	url, err = helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/addPulse")
 	if err != nil {
 		return "", err
@@ -397,21 +397,25 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 	}
 
 	data := make(map[string]interface{})
-	data["PulseId"] = pulseId
+	data["pulseId"] = strconv.FormatUint(pulseId, 10)
+
 	switch SubType(dataType) {
 	case Int64:
-		data["Value"], err = strconv.ParseInt(value.Value, 10, 64)
+		v , err := strconv.ParseInt(value.Value, 10, 64)
 		if err != nil {
 			return err
 		}
+		data["Value"] = hex.EncodeToString([]byte(strconv.FormatInt(v, 10)))
 	case String:
-		data["Value"] = value.Value
+		data["Value"] = hex.EncodeToString([]byte(value.Value))
 	case Bytes:
-		data["Value"], err = base64.StdEncoding.DecodeString(value.Value)
+		v, err := base64.StdEncoding.DecodeString(value.Value)
 		if err != nil {
 			return err
 		}
+		data["value"] = hex.EncodeToString(v)
 	}
+
 	jsonData, err := json.Marshal(data)
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/sendValueToSubs")
 	if err != nil {
