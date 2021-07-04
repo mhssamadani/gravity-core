@@ -35,7 +35,7 @@ import (
 //)
 //
 //type SubType uint8
-type AvaxAdaptor struct {
+type PolygonAdaptor struct {
 	privKey *ecdsa.PrivateKey
 
 	ghClient  *gravity.Client
@@ -43,10 +43,10 @@ type AvaxAdaptor struct {
 
 	gravityContract *ethereum.Gravity
 }
-type AvaxAdapterOption func(*AvaxAdaptor) error
+type PolygonAdapterOption func(*PolygonAdaptor) error
 
-func WithAvaxGravityContract(address string) AvaxAdapterOption {
-	return func(h *AvaxAdaptor) error {
+func WithPolygonGravityContract(address string) PolygonAdapterOption {
+	return func(h *PolygonAdaptor) error {
 		hexAddress, err := hexutil.Decode(address)
 		if err != nil {
 			return err
@@ -61,14 +61,14 @@ func WithAvaxGravityContract(address string) AvaxAdapterOption {
 		return nil
 	}
 }
-func AvaxAdapterWithGhClient(ghClient *gravity.Client) AvaxAdapterOption {
-	return func(h *AvaxAdaptor) error {
+func PolygonAdapterWithGhClient(ghClient *gravity.Client) PolygonAdapterOption {
+	return func(h *PolygonAdaptor) error {
 		h.ghClient = ghClient
 		return nil
 	}
 }
 
-func NewAvaxAdaptor(privKey []byte, nodeUrl string, ctx context.Context, opts ...AvaxAdapterOption) (*AvaxAdaptor, error) {
+func NewPolygonAdaptor(privKey []byte, nodeUrl string, ctx context.Context, opts ...PolygonAdapterOption) (*PolygonAdaptor, error) {
 	ethClient, err := ethclient.DialContext(ctx, nodeUrl)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func NewAvaxAdaptor(privKey []byte, nodeUrl string, ctx context.Context, opts ..
 	ethPrivKey.D.SetBytes(privKey)
 	ethPrivKey.PublicKey.X, ethPrivKey.PublicKey.Y = ethPrivKey.PublicKey.Curve.ScalarBaseMult(privKey)
 
-	adapter := &AvaxAdaptor{
+	adapter := &PolygonAdaptor{
 		privKey:   ethPrivKey,
 		ethClient: ethClient,
 	}
@@ -97,7 +97,7 @@ func NewAvaxAdaptor(privKey []byte, nodeUrl string, ctx context.Context, opts ..
 	return adapter, nil
 }
 
-func (adaptor *AvaxAdaptor) GetHeight(ctx context.Context) (uint64, error) {
+func (adaptor *PolygonAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	tcHeightRq, err := adaptor.ethClient.BlockByNumber(ctx, nil)
 	if err != nil {
 		return 0, err
@@ -105,7 +105,7 @@ func (adaptor *AvaxAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 
 	return tcHeightRq.NumberU64(), nil
 }
-func (adaptor *AvaxAdaptor) Sign(msg []byte) ([]byte, error) {
+func (adaptor *PolygonAdaptor) Sign(msg []byte) ([]byte, error) {
 	sig, err := crypto.Sign(msg, adaptor.privKey)
 	if err != nil {
 		return nil, err
@@ -113,10 +113,12 @@ func (adaptor *AvaxAdaptor) Sign(msg []byte) ([]byte, error) {
 
 	return sig, nil
 }
-func (adaptor *AvaxAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
+
+func (adaptor *PolygonAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
 	return adaptor.Sign(hash)
 }
-func (adaptor *AvaxAdaptor) WaitTx(id string, ctx context.Context) error {
+
+func (adaptor *PolygonAdaptor) WaitTx(id string, ctx context.Context) error {
 	tx, _, err := adaptor.ethClient.TransactionByHash(ctx, common.HexToHash(id))
 	if err != nil {
 		return err
@@ -128,12 +130,12 @@ func (adaptor *AvaxAdaptor) WaitTx(id string, ctx context.Context) error {
 
 	return nil
 }
-func (adaptor *AvaxAdaptor) PubKey() account.OraclesPubKey {
+func (adaptor *PolygonAdaptor) PubKey() account.OraclesPubKey {
 	pubKey := crypto.CompressPubkey(&adaptor.privKey.PublicKey)
 	oraclePubKey := account.BytesToOraclePubKey(pubKey[:], account.Ethereum)
 	return oraclePubKey
 }
-func (adaptor *AvaxAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
+func (adaptor *PolygonAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
 	if err != nil {
 		return 0, err
@@ -147,7 +149,7 @@ func (adaptor *AvaxAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Con
 	return abi.ExtractorType(exType), nil
 }
 
-func (adaptor *AvaxAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
+func (adaptor *PolygonAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
 	if err != nil {
 		return "", err
@@ -217,7 +219,11 @@ func (adaptor *AvaxAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	var resultBytes32 [32]byte
 	copy(resultBytes32[:], hash)
 
-	opt := bind.NewKeyedTransactor(adaptor.privKey)
+	opt, err := bind.NewKeyedTransactorWithChainID(adaptor.privKey, big.NewInt(int64(137)))
+	if err != nil {
+		return "", err
+	}
+	opt.GasLimit = 150000 * 5
 	opt.Context = ctx
 	opt.GasPrice, err = adaptor.ethClient.SuggestGasPrice(ctx)
 	if err != nil {
@@ -231,7 +237,7 @@ func (adaptor *AvaxAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	}
 	return tx.Hash().String(), nil
 }
-func (adaptor *AvaxAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId uint64, value *extractor.Data, ctx context.Context) error {
+func (adaptor *PolygonAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId uint64, value *extractor.Data, ctx context.Context) error {
 	var err error
 
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
@@ -251,7 +257,12 @@ func (adaptor *AvaxAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 			return err
 		}
 
-		transactOpt := bind.NewKeyedTransactor(adaptor.privKey)
+		transactOpt, err := bind.NewKeyedTransactorWithChainID(adaptor.privKey, big.NewInt(137))
+		if err != nil {
+			zap.L().Error(err.Error())
+			return err
+		}
+		transactOpt.GasLimit = 150000 * 5
 		transactOpt.Context = ctx
 		zap.L().Sugar().Debug("transactOpt is nil", transactOpt == nil)
 		switch SubType(t) {
@@ -292,7 +303,7 @@ func (adaptor *AvaxAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 	return nil
 }
 
-func (adaptor *AvaxAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
+func (adaptor *PolygonAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
 	if err != nil {
 		return "", err
@@ -356,16 +367,20 @@ func (adaptor *AvaxAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		s[index] = bytes32S
 		v[index] = sign[64:][0] + 27
 	}
-	opts := bind.NewKeyedTransactor(adaptor.privKey)
-	opts.Context = ctx
-	tx, err := nebula.UpdateOracles(opts, oraclesAddresses, v[:], r[:], s[:], big.NewInt(round))
+	transactor, err := bind.NewKeyedTransactorWithChainID(adaptor.privKey, big.NewInt(int64(137)))
+	if err != nil {
+		return "", err
+	}
+	transactor.GasLimit = 150000 * 5
+	transactor.Context = ctx
+	tx, err := nebula.UpdateOracles(transactor, oraclesAddresses, v[:], r[:], s[:], big.NewInt(round))
 	if err != nil {
 		return "", err
 	}
 
 	return tx.Hash().Hex(), nil
 }
-func (adaptor *AvaxAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
+func (adaptor *PolygonAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
 	consuls, err := adaptor.gravityContract.GetConsuls(nil)
 	if err != nil {
 		return "", err
@@ -414,16 +429,20 @@ func (adaptor *AvaxAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		s[index] = bytes32S
 		v[index] = sign[64:][0] + 27
 	}
-	opts := bind.NewKeyedTransactor(adaptor.privKey)
-	opts.Context = ctx
-	tx, err := adaptor.gravityContract.UpdateConsuls(opts, consulsAddress, v[:], r[:], s[:], big.NewInt(round))
+	transactor, err := bind.NewKeyedTransactorWithChainID(adaptor.privKey, big.NewInt(int64(137)))
+	if err != nil {
+		return "", err
+	}
+	transactor.GasLimit = 150000 * 5
+	transactor.Context = ctx
+	tx, err := adaptor.gravityContract.UpdateConsuls(transactor, consulsAddress, v[:], r[:], s[:], big.NewInt(round))
 	if err != nil {
 		return "", err
 	}
 
 	return tx.Hash().Hex(), nil
 }
-func (adaptor *AvaxAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
+func (adaptor *PolygonAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
 	var oraclesAddresses []common.Address
 	for _, v := range consulsAddresses {
 		if v == nil {
@@ -448,7 +467,7 @@ func (adaptor *AvaxAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 
 	return sign, nil
 }
-func (adaptor *AvaxAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
+func (adaptor *PolygonAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
 	if err != nil {
 		return nil, err
@@ -480,7 +499,7 @@ func (adaptor *AvaxAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 	return sign, nil
 }
 
-func (adaptor *AvaxAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.Context) (uint64, error) {
+func (adaptor *PolygonAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.Context) (uint64, error) {
 	nebula, err := ethereum.NewNebula(common.BytesToAddress(nebulaId.ToBytes(account.Ethereum)), adaptor.ethClient)
 	if err != nil {
 		return 0, err
@@ -493,7 +512,7 @@ func (adaptor *AvaxAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 
 	return lastId.Uint64(), nil
 }
-func (adaptor *AvaxAdaptor) LastRound(ctx context.Context) (uint64, error) {
+func (adaptor *PolygonAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	lastRound, err := adaptor.gravityContract.LastRound(nil)
 	if err != nil {
 		return 0, err
@@ -501,7 +520,7 @@ func (adaptor *AvaxAdaptor) LastRound(ctx context.Context) (uint64, error) {
 
 	return lastRound.Uint64(), nil
 }
-func (adaptor *AvaxAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
+func (adaptor *PolygonAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
 	consuls, err := adaptor.gravityContract.GetConsulsByRoundId(nil, big.NewInt(roundId))
 	if err != nil {
 		return false, err

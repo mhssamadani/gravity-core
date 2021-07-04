@@ -481,6 +481,12 @@ func startLedger(ctx *cli.Context) error {
 		}
 	}()
 
+	err = rpc.NewGlobalClient(tConfig.RPC.ListenAddress)
+	if err != nil {
+		zap.L().Error(err.Error())
+		return err
+	}
+
 	rpcConfig, err := rpc.NewConfig(rpcHost, tConfig.RPC.ListenAddress, ledgerValidator.PrivKey)
 	if err != nil {
 		zap.L().Error(err.Error())
@@ -534,6 +540,12 @@ func createApp(db *badger.DB, ledgerValidator *account.LedgerValidator, privKeys
 			}
 		case account.Binance:
 			adaptor, err = adaptors.NewBinanceAdaptor(privKey, v.NodeUrl, ctx, adaptors.WithBinanceGravityContract(v.GravityContractAddress))
+			if err != nil {
+				zap.L().Error(err.Error())
+				return nil, err
+			}
+		case account.Polygon:
+			adaptor, err = adaptors.NewPolygonAdaptor(privKey, v.NodeUrl, ctx, adaptors.WithPolygonGravityContract(v.GravityContractAddress))
 			if err != nil {
 				zap.L().Error(err.Error())
 				return nil, err
