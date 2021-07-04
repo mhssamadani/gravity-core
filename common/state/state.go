@@ -66,6 +66,7 @@ func SetState(tx *transactions.Transaction, store *storage.Storage, adaptors map
 		return err
 	}
 	zap.L().Sugar().Debugf("SetState func[%s]", tx.Func)
+	//scheduler.PublishMessage("example.topic", []byte(fmt.Sprintf("SetState func[%s]", tx.Func)))
 	switch tx.Func {
 	case transactions.Commit:
 		return commit(store, tx)
@@ -93,6 +94,10 @@ func SetState(tx *transactions.Transaction, store *storage.Storage, adaptors map
 		return approveLastRound(store, adaptors, height, isSync, ctx)
 	case transactions.SetSolanaRecentBlock:
 		return setSolanaRecentBlock(store, tx)
+	case transactions.SetNebulaCustomParams:
+		return setNebulaCustomParams(store, tx)
+	case transactions.DropNebulaCustomParams:
+		return dropNebulaCustomParams(store, tx)
 	default:
 		return ErrFuncNotFound
 	}
@@ -173,6 +178,8 @@ func addOracleInNebula(store *storage.Storage, tx *transactions.Transaction) err
 	} else if err != nil {
 		return err
 	}
+
+	zap.L().Sugar().Debug("ORACLES BY NEBULA", oraclesByNebula)
 
 	if _, ok := oraclesByNebula[pubKey.ToString(nebula.ChainType)]; ok {
 		return ErrAddOracleInNebula
@@ -344,7 +351,7 @@ func signNewOracles(store *storage.Storage, tx *transactions.Transaction) error 
 	if err != nil && err != storage.ErrKeyNotFound {
 		return err
 	} else if err == nil {
-		return ErrSignIsExist
+		//return ErrSignIsExist
 	}
 
 	err = store.SetSignOracles(tx.SenderPubKey, nebulaAddress, roundId, sign)
@@ -389,4 +396,31 @@ func approveLastRound(store *storage.Storage, adaptors map[account.ChainType]ada
 		return err
 	}
 	return nil
+}
+
+func setNebulaCustomParams(store *storage.Storage, tx *transactions.Transaction) error {
+	nebulaId := account.BytesToNebulaId(tx.Value(0).([]byte))
+	nebulaCustomParamsBytes := tx.Value(1).([]byte)
+
+	nebula, err := store.NebulaInfo(nebulaId)
+	if err != nil && err != storage.ErrKeyNotFound {
+		return err
+	}
+
+	if err == nil && nebula.Owner != tx.SenderPubKey {
+		return ErrInvalidNebulaOwner
+	}
+
+	var nebulaCustomParams storage.NebulaCustomParams
+	err = json.Unmarshal(nebulaCustomParamsBytes, &nebulaCustomParams)
+	if err != nil {
+		return err
+	}
+
+	return store.SetNebulaCustomParams(nebulaId, nebulaCustomParams)
+}
+
+func dropNebulaCustomParams(store *storage.Storage, tx *transactions.Transaction) error {
+	nebulaId := account.BytesToNebulaId(tx.Value(0).([]byte))
+	return store.DropNebulaCustomParams(nebulaId)
 }

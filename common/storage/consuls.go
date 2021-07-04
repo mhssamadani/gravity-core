@@ -31,6 +31,8 @@ func formSignConsulsByConsulKey(pubKey account.ConsulPubKey, chainType account.C
 		prefix = "avax"
 	case account.Solana:
 		prefix = "solana"
+	case account.Polygon:
+		prefix = "polygon"
 	case account.Ergo:
 		prefix = "erg"
 	}
