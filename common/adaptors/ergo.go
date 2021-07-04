@@ -251,6 +251,10 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	return []byte(responseObject.Signed.A + responseObject.Signed.Z), nil
 }
 
+func (adaptor *ErgoAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
+	return adaptor.Sign(hash)
+}
+
 func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	type Response struct {
 		Status  bool   `json:"success"`
@@ -651,7 +655,7 @@ func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 	return sign, err
 }
 
-func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey) ([]byte, error) {
+func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var stringOracles []string
 	for _, v := range oracles {
 		if v == nil {
