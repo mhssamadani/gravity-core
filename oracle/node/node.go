@@ -105,6 +105,11 @@ func New(nebulaId account.NebulaId, chainType account.ChainType,
 		if err != nil {
 			return nil, err
 		}
+	case account.Polygon:
+		adaptor, err = adaptors.NewPolygonAdaptor(oracleSecretKey, targetChainNodeUrl, ctx, adaptors.PolygonAdapterWithGhClient(ghClient))
+		if err != nil {
+			return nil, err
+		}
 	case account.Ethereum:
 		adaptor, err = adaptors.NewEthereumAdaptor(oracleSecretKey, targetChainNodeUrl, ctx, adaptors.EthAdapterWithGhClient(ghClient))
 		if err != nil {
@@ -131,7 +136,7 @@ func New(nebulaId account.NebulaId, chainType account.ChainType,
 	if err != nil {
 		return nil, err
 	}
-
+	zap.L().Sugar().Debug("Creating oracle, nbula is ", nebulaId)
 	return &Node{
 		validator: validator,
 		nebulaId:  nebulaId,
@@ -224,9 +229,27 @@ func (node *Node) Start(ctx context.Context) {
 	var pulseCountInBlock uint64
 	var lastPulseId uint64
 
+	node.gravityClient.HttpClient.WSEvents.Start()
+	defer node.gravityClient.HttpClient.WSEvents.Stop()
+	ch, err := node.gravityClient.HttpClient.WSEvents.Subscribe(ctx, "gravity-oracle", "tm.event='NewBlock'", 999)
+
+	if err != nil {
+		zap.L().Sugar().Debug("Subscribe Error: ", err.Error())
+		panic(err)
+	}
+	// else {
+	// 	go func() {
+	// 		for {
+	// 			a := <-ch
+	// 			zap.L().Sugar().Debug(a)
+	// 		}
+	// 	}()
+	// }
+
 	roundState := new(RoundState)
 	for {
-		time.Sleep(time.Duration(TimeoutMs) * time.Millisecond)
+		//time.Sleep(time.Duration(TimeoutMs) * time.Millisecond)
+		<-ch
 		if pulseCountInBlock >= node.MaxPulseCountInBlock {
 			continue
 		}
@@ -323,6 +346,7 @@ func (node *Node) execute(pulseId uint64, round state.SubRound, tcHeight uint64,
 			zap.L().Debug("Commit subround Extractor Data is empty")
 			return nil
 		}
+		zap.L().Sugar().Debug("Extracted data ", data)
 
 		commit, err := node.commit(data, intervalId, pulseId)
 		if err != nil {
@@ -358,7 +382,10 @@ func (node *Node) execute(pulseId uint64, round state.SubRound, tcHeight uint64,
 		if roundState.data == nil && !roundState.RevealExist {
 			return nil
 		}
-
+		if roundState.resultValue != nil {
+			zap.L().Debug("Round sign exists")
+			return nil
+		}
 		value, hash, err := node.signResult(intervalId, pulseId, ctx)
 		if err != nil {
 			zap.L().Error(err.Error())
@@ -409,7 +436,7 @@ func (node *Node) execute(pulseId uint64, round state.SubRound, tcHeight uint64,
 			zap.L().Debug("Oracles map is empty")
 			return nil
 		}
-		if tcHeight%uint64(len(oracles)) != myRound {
+		if intervalId%uint64(len(oracles)) != myRound {
 			zap.L().Debug("Len oracles != myRound")
 			return nil
 		}
