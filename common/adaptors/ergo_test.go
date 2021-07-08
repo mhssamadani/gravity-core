@@ -1,9 +1,9 @@
 package adaptors
 
 import (
+	"context"
 	"encoding/hex"
 	"github.com/Gravity-Tech/gravity-core/common/gravity"
-	"context"
 	"time"
 
 	crypto "crypto/ed25519"
@@ -98,7 +98,7 @@ func TestErgoAdaptor_GetHeight(t *testing.T) {
 	rand.Read(seed)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://10.10.10.4:9016"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -138,7 +138,7 @@ func TestErgoAdaptor_Sign(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://10.10.10.4:9016"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -179,7 +179,7 @@ func TestErgoAdaptor_WaitTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://10.10.10.4:9016"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,

@@ -88,7 +88,7 @@ var (
 				GravityContractAddress: "3PLpMu2cAg618e7xXYHtckFJjFZksPFHoLm",
 			},
 			account.Ergo.String(): {
-				NodeUrl: "http://10.10.10.4:9016",
+				NodeUrl: "http://176.9.65.58:9016/",
 				ChainType: account.Ergo.String(),
 				GravityContractAddress: "",
 			},
