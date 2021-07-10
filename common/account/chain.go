@@ -17,6 +17,7 @@ const (
 	Solana
 	Polygon
 	Ergo
+	Sigma
 )
 
 var (
@@ -44,6 +45,8 @@ func ParseChainType(chainType string) (ChainType, error) {
 		return Polygon, nil
 	case "erg":
 		return Ergo, nil
+	case "sigma":
+		return Sigma, nil
 	default:
 		return 0, ErrParseChainType
 	}
@@ -68,6 +71,8 @@ func (ch ChainType) String() string {
 		return "polygon"
 	case Ergo:
 		return "erg"
+	case Sigma:
+		return "sigma"
 	default:
 		return "ethereum"
 	}

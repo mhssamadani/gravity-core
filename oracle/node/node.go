@@ -130,6 +130,11 @@ func New(nebulaId account.NebulaId, chainType account.ChainType,
 		if err != nil {
 			return nil, err
 		}
+	case account.Sigma:
+		adaptor, err = adaptors.NewSigmaAdapter(oracleSecretKey, targetChainNodeUrl, ctx, adaptors.SigmaAdapterWithGhClient(ghClient))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	exType, err := adaptor.ValueType(nebulaId, ctx)

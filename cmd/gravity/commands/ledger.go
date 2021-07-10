@@ -90,6 +90,11 @@ var (
 			account.Ergo.String(): {
 				NodeUrl: "http://176.9.65.58:9016/",
 				ChainType: account.Ergo.String(),
+				GravityContractAddress: "", // Handled in the proxy side of Ergo
+			},
+			account.Sigma.String(): {
+				NodeUrl: "http://176.9.65.58:9016/",
+				ChainType: account.Sigma.String(),
 				GravityContractAddress: "",
 			},
 			account.Heco.String(): {
@@ -570,6 +575,12 @@ func createApp(db *badger.DB, ledgerValidator *account.LedgerValidator, privKeys
 			}
 		case account.Ergo:
 			adaptor, err = adaptors.NewErgoAdapter(privKey, v.NodeUrl, ctx, adaptors.WithErgoGravityContract(v.GravityContractAddress))
+			if err != nil {
+				zap.L().Error(err.Error())
+				return nil, err
+			}
+		case account.Sigma:
+			adaptor, err = adaptors.NewSigmaAdapter(privKey, v.NodeUrl, ctx, adaptors.WithSigmaGravityContract(v.GravityContractAddress))
 			if err != nil {
 				zap.L().Error(err.Error())
 				return nil, err
