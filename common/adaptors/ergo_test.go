@@ -2,8 +2,9 @@ package adaptors
 
 import (
 	"context"
-	"encoding/hex"
+	"github.com/Gravity-Tech/gravity-core/common/account"
 	"github.com/Gravity-Tech/gravity-core/common/gravity"
+	"reflect"
 	"time"
 
 	crypto "crypto/ed25519"
@@ -72,25 +73,18 @@ func TestErgoAdaptor_applyOpts(t *testing.T) {
 }
 
 func TestErgoAdaptor_GetHeight(t *testing.T) {
-	f := NewFactory()
-	if f != nil {
-	}
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel1()
+	defer cancel2()
 
-	type Response struct {
-		Status bool   `json:"success"`
-		Height uint64 `json:"height"`
-	}
-	wanted := Response{
-		Status: true,
-	}
-	ctx, _ := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	tests := []struct {
 		name    string
 		ctx     context.Context
 		wantErr bool
-		want    Response
 	}{
-		{name: "Test valid options", ctx: ctx, wantErr: false, want: wanted},
+		{name: "Test valid options", ctx: ctx2, wantErr: false},
+		{name: "Test valid options", ctx: ctx1, wantErr: true},
 
 		// TODO: Add test cases.
 	}
@@ -106,7 +100,7 @@ func TestErgoAdaptor_GetHeight(t *testing.T) {
 			}
 			if height, err := er.GetHeight(tt.ctx); (err != nil) != tt.wantErr {
 				t.Errorf("ErgoAdaptor.GetHeight error = %v, wantErr %v", err, tt.wantErr)
-			}else{
+			} else {
 				t.Logf("ErgoAdaptor.GetHeight height = %v", height)
 			}
 
@@ -115,22 +109,11 @@ func TestErgoAdaptor_GetHeight(t *testing.T) {
 }
 
 func TestErgoAdaptor_Sign(t *testing.T) {
-
-
-	type Response struct {
-		Status bool `json:"success"`
-	}
-	wanted := Response{
-		Status: true,
-	}
-
 	tests := []struct {
-		name    string
-		msg     []byte
-		wantErr bool
-		want    Response
+		name string
+		msg  []byte
 	}{
-		{name: "Test valid options", msg: []byte("salam"), wantErr: false, want: wanted},
+		{name: "Test valid options", msg: []byte("salam")},
 		// TODO: Add test cases.
 	}
 	seed := make([]byte, 32)
@@ -144,18 +127,16 @@ func TestErgoAdaptor_Sign(t *testing.T) {
 				ergoClient: client,
 				secret:     secret,
 			}
-			if signs, err := er.Sign(tt.msg); (err != nil) != tt.wantErr {
-				t.Errorf("ErgoAdaptor.sign error = %v, wantErr %v", err, tt.wantErr)
-			}else{
-				t.Logf("ErgoAdaptor.sign sign = %v", hex.EncodeToString(signs))
+			if signs, err := er.Sign(tt.msg); err != nil {
+				t.Errorf("ErgoAdaptor.sign error = %v", err)
+			} else {
+				t.Logf("ErgoAdaptor.sign sign = %v", signs)
 			}
 		})
 	}
 }
 
 func TestErgoAdaptor_WaitTx(t *testing.T) {
-
-
 	type Response struct {
 		Status  bool `json:"success"`
 		Confirm int  `json:"numConfirmations"`
@@ -166,7 +147,7 @@ func TestErgoAdaptor_WaitTx(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		id     string
+		id      string
 		wantErr bool
 		want    Response
 	}{
@@ -192,3 +173,105 @@ func TestErgoAdaptor_WaitTx(t *testing.T) {
 	}
 }
 
+func TestErgo_PubKey(t *testing.T) {
+	type Response struct {
+		Status  bool   `json:"success"`
+		Address string `json:"address"`
+		Pk      string `json:"pk"`
+	}
+	tests := []struct {
+		name    string
+	}{
+		{name: "Test invalid options"},
+		// TODO: Add test cases.
+	}
+	seed := make([]byte, 32)
+	rand.Read(seed)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			secret := crypto.NewKeyFromSeed(seed)
+			er := &ErgoAdaptor{
+				ergoClient: client,
+				secret:     secret,
+			}
+			if pk := er.PubKey(); reflect.DeepEqual(pk.ToBytes(account.Ergo), []byte{}) {
+				t.Errorf("ErgoAdaptor.Pubkey has some problem in making oracle pk")
+			}
+		})
+	}
+}
+
+func TestErgoAdaptor_LastPulseId(t *testing.T) {
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel1()
+	defer cancel2()
+
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		nebulaId [32]byte
+		wantErr bool
+	}{
+		{name: "Test valid options", nebulaId: [32]byte{}, ctx: ctx2, wantErr: false},
+		{name: "Test valid options", nebulaId: [32]byte{}, ctx: ctx1, wantErr: true},
+
+		// TODO: Add test cases.
+	}
+	seed := make([]byte, 32)
+	rand.Read(seed)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			secret := crypto.NewKeyFromSeed(seed)
+			er := &ErgoAdaptor{
+				ergoClient: client,
+				secret:     secret,
+			}
+			if pulseId, err := er.LastPulseId(tt.nebulaId, tt.ctx); (err != nil) != tt.wantErr {
+				t.Errorf("ErgoAdaptor.LastPulseId error = %v, wantErr %v", err, tt.wantErr)
+			} else {
+				t.Logf("ErgoAdaptor.LastPulseId pulseId = %v", pulseId)
+			}
+
+		})
+	}
+}
+
+func TestErgoAdaptor_LastRound(t *testing.T) {
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel1()
+	defer cancel2()
+
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		wantErr bool
+	}{
+		{name: "Test valid options", ctx: ctx2, wantErr: false},
+		{name: "Test valid options", ctx: ctx1, wantErr: true},
+
+		// TODO: Add test cases.
+	}
+	seed := make([]byte, 32)
+	rand.Read(seed)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			secret := crypto.NewKeyFromSeed(seed)
+			er := &ErgoAdaptor{
+				ergoClient: client,
+				secret:     secret,
+			}
+			if round, err := er.LastRound(tt.ctx); (err != nil) != tt.wantErr {
+				t.Errorf("ErgoAdaptor.LastRound error = %v, wantErr %v", err, tt.wantErr)
+			} else {
+				t.Logf("ErgoAdaptor.LastRound round = %v", round)
+			}
+
+		})
+	}
+}

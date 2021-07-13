@@ -152,7 +152,7 @@ func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
 	}
 	out := make(chan error)
 	const TxWaitCount = 10
-	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "/numConfirmations")
+	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
@@ -201,7 +201,7 @@ func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 		Status bool   `json:"success"`
 		Height uint64 `json:"height"`
 	}
-	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "/height")
+	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "height")
 	if err != nil {
 		return 0, err
 	}
@@ -228,9 +228,9 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 		Status bool `json:"success"`
 		Signed Sign `json:"signed"`
 	}
-	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": string(adaptor.secret)}
+	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"/sign", "application/json", bytes.NewBuffer(jsonValue))
+	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"sign", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		return nil, err
 	}
@@ -261,9 +261,9 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
-	values := map[string]string{"sk": string(adaptor.secret)}
+	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"/getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
+	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
