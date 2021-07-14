@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -64,9 +63,9 @@ func generateErgoPrivKeys() (*Key, error) {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
-	rand := cryptorand.Reader
 	seed := make([]byte, 32)
-	if _, err := io.ReadFull(rand, seed); err != nil {
+	_, err := cryptorand.Read(seed)
+	if err != nil {
 		panic(err)
 	}
 	secret := ergCrypto.NewKeyFromSeed(seed)
