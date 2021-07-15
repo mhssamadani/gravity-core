@@ -1,6 +1,7 @@
 package account
 
 import (
+	ergCrypto "crypto/ed25519"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	solana_common "github.com/portto/solana-go-sdk/common"
@@ -16,7 +17,7 @@ func StringToPrivKey(value string, chainType ChainType) ([]byte, error) {
 	var privKey []byte
 	var err error
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo, Sigma:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon:
 		privKey, err = hexutil.Decode(value)
 		if err != nil {
 			return nil, err
@@ -31,6 +32,9 @@ func StringToPrivKey(value string, chainType ChainType) ([]byte, error) {
 			return nil, err
 		}
 		privKey = secret.Bytes()
+	case Ergo:
+		seed := []byte(value)
+		privKey = ergCrypto.NewKeyFromSeed(seed)
 	}
 
 	return privKey, nil
@@ -39,7 +43,7 @@ func StringToPrivKey(value string, chainType ChainType) ([]byte, error) {
 func BytesToOraclePubKey(value []byte, chainType ChainType) OraclesPubKey {
 	var pubKey OraclesPubKey
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo, Sigma:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo:
 		copy(pubKey[:], value[0:33])
 	case Waves:
 		copy(pubKey[:], append([]byte{0}, value[0:32]...))
@@ -52,7 +56,7 @@ func BytesToOraclePubKey(value []byte, chainType ChainType) OraclesPubKey {
 func (pubKey *OraclesPubKey) ToBytes(chainType ChainType) []byte {
 	var v []byte
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo, Sigma:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo:
 		v = pubKey[:33]
 	case Waves:
 		v = pubKey[1:33]
@@ -64,7 +68,7 @@ func (pubKey *OraclesPubKey) ToBytes(chainType ChainType) []byte {
 func (pubKey *OraclesPubKey) ToString(chainType ChainType) string {
 	b := pubKey.ToBytes(chainType)
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo, Sigma:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo:
 		return hexutil.Encode(b)
 	case Waves:
 		return base58.Encode(b)
@@ -79,7 +83,7 @@ func StringToOraclePubKey(value string, chainType ChainType) (OraclesPubKey, err
 	var pubKey []byte
 	var err error
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo, Sigma:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, Ergo:
 		pubKey, err = hexutil.Decode(value)
 		if err != nil {
 			return [33]byte{}, err

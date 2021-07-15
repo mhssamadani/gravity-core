@@ -95,7 +95,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	return &Key{
 		Address: responseObject.Address,
 		PubKey:  responseObject.Pk,
-		PrivKey: hex.EncodeToString(secret),
+		PrivKey: string(seed),
 	}, nil
 
 }
