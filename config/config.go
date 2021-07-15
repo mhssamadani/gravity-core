@@ -2,9 +2,9 @@ package config
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 
@@ -57,24 +57,28 @@ func generateWavesPrivKeys(chain byte) (*Key, error) {
 }
 
 func generateErgoPrivKeys() (*Key, error) {
+
 	type Response struct {
 		Status  bool   `json:"success"`
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
-	rand := cryptorand.Reader
 	seed := make([]byte, 32)
-	if _, err := io.ReadFull(rand, seed); err != nil {
+	_, err := cryptorand.Read(seed)
+	if err != nil {
 		panic(err)
 	}
 	secret := ergCrypto.NewKeyFromSeed(seed)
-	values := map[string]string{"sk": string(secret)}
+	values := map[string]string{"sk": hex.EncodeToString(secret)}
+
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(ergClient.DefaultOptions.BaseUrl+"/getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
+
+	res, err := http.Post(ergClient.DefaultOptions.BaseUrl+"getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
 	response, err := ioutil.ReadAll(res.Body)
+
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +95,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	return &Key{
 		Address: responseObject.Address,
 		PubKey:  responseObject.Pk,
-		PrivKey: string(secret),
+		PrivKey: hex.EncodeToString(secret),
 	}, nil
 
 }
