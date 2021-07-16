@@ -230,7 +230,12 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"sign", "application/json", bytes.NewBuffer(jsonValue))
+	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "height")
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +268,8 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	}
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.ergoClient.Options.BaseUrl+"getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
+	url, _ := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "getAddressDetail")
+	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}

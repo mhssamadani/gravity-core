@@ -1,7 +1,7 @@
 package account
 
 import (
-	ergCrypto "crypto/ed25519"
+	"encoding/hex"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	solana_common "github.com/portto/solana-go-sdk/common"
@@ -33,8 +33,10 @@ func StringToPrivKey(value string, chainType ChainType) ([]byte, error) {
 		}
 		privKey = secret.Bytes()
 	case Ergo:
-		seed := []byte(value)
-		privKey = ergCrypto.NewKeyFromSeed(seed)
+		privKey, err = hex.DecodeString(value)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return privKey, nil
