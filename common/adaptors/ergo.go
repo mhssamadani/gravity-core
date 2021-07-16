@@ -287,7 +287,8 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
-	oraclePubKey := account.BytesToOraclePubKey([]byte(responseObject.Pk), account.Ergo)
+	pk, _ := hex.DecodeString(responseObject.Pk)
+	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
 
