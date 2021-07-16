@@ -152,7 +152,7 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 	}
 	out := make(chan error)
 	const TxWaitCount = 10
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "/numConfirmations")
+	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
@@ -201,7 +201,7 @@ func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 		Status bool   `json:"success"`
 		Height uint64 `json:"height"`
 	}
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "/height")
+	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "height")
 	if err != nil {
 		return 0, err
 	}
@@ -230,7 +230,11 @@ func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.SigmaClient.Options.BaseUrl+"/sign", "application/json", bytes.NewBuffer(jsonValue))
+	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "sign")
+	if err != nil {
+		return nil, err
+	}
+	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +267,9 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	}
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	res, err := http.Post(adaptor.SigmaClient.Options.BaseUrl+"/getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
+	url, _ := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "getAddressDetail")
+
+	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
@@ -281,7 +287,8 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
-	oraclePubKey := account.BytesToOraclePubKey([]byte(responseObject.Pk), account.Sigma)
+	pk, _ := hex.DecodeString(responseObject.Pk)
+	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
 
@@ -344,13 +351,13 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 
 	// Iterate over oracles and get signs
 	for _, oracle := range oracles {
-		pubKey, err := account.StringToOraclePubKey(oracle, account.Sigma)
+		pubKey, err := account.StringToOraclePubKey(oracle, account.Ergo)
 		if err != nil {
 			signsA = append(signsA, hex.EncodeToString([]byte{0}))
 			signsZ = append(signsZ, hex.EncodeToString([]byte{0}))
 			continue
 		}
-		sign, err := adaptor.ghClient.Result(account.Sigma, nebulaId, int64(pulseId), pubKey)
+		sign, err := adaptor.ghClient.Result(account.Ergo, nebulaId, int64(pulseId), pubKey)
 
 		if err != nil {
 			signsA = append(signsA, hex.EncodeToString([]byte{0}))
@@ -483,7 +490,7 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	}
 
 	for k, sign := range signs {
-		pubKey := k.ToString(account.Sigma)
+		pubKey := k.ToString(account.Ergo)
 		index := -1
 
 		for i, v := range consuls {
@@ -516,7 +523,7 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 			newOracles = append(newOracles, hex.EncodeToString([]byte{0}))
 			continue
 		}
-		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Sigma)))
+		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
 	url, err = helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/updateOracles")
@@ -580,7 +587,7 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	}
 
 	for k, sign := range signs {
-		pubKey := k.ToString(account.Sigma)
+		pubKey := k.ToString(account.Ergo)
 		index := -1
 
 		for i, v := range consuls {
@@ -613,7 +620,7 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 			newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
 			continue
 		}
-		newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Sigma)))
+		newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
 	emptyCount := ConsulsNumber - len(newConsulsString)
@@ -643,7 +650,7 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 			msg = append(msg, hex.EncodeToString([]byte{0}))
 			continue
 		}
-		msg = append(msg, hex.EncodeToString(v.ToBytes(account.Sigma)))
+		msg = append(msg, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 	msg = append(msg, fmt.Sprintf("%d", roundId))
 
@@ -662,7 +669,7 @@ func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*a
 			stringOracles = append(stringOracles, hex.EncodeToString([]byte{1}))
 			continue
 		}
-		stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Sigma)))
+		stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
 	sign, err := adaptor.Sign([]byte(strings.Join(stringOracles, ",")))
