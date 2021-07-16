@@ -19,10 +19,4 @@ func TestGenerateErgoPrivKeys(t *testing.T) {
 	if decoded == nil {
 		t.Fatalf("Address is not correct: \n Address: %v", key.Address)
 	}
-	_, err = hex.DecodeString(key.PrivKey)
-	if err != nil {
-		t.Fatalf("PrivKey is not correct: error: %v, \n PrivKey: %v", err, key.PrivKey)
-	}
-
-
 }
