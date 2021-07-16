@@ -72,8 +72,11 @@ func generateErgoPrivKeys() (*Key, error) {
 	values := map[string]string{"sk": hex.EncodeToString(secret)}
 
 	jsonValue, _ := json.Marshal(values)
-
-	res, err := http.Post(ergClient.DefaultOptions.BaseUrl+"getAddressDetail", "application/json", bytes.NewBuffer(jsonValue))
+	url, err := ergClient.JoinUrl(ergClient.DefaultOptions.BaseUrl, "getAddressDetail")
+	if err != nil {
+		panic(err)
+	}
+	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +98,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	return &Key{
 		Address: responseObject.Address,
 		PubKey:  responseObject.Pk,
-		PrivKey: string(seed),
+		PrivKey: hex.EncodeToString(seed),
 	}, nil
 
 }
