@@ -11,6 +11,7 @@ import (
 	"github.com/Gravity-Tech/gravity-core/abi"
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"github.com/gookit/validate"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -708,6 +709,8 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
+	zap.L().Sugar().Debugf("\t\tLastRound\t\t")
+
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
 		return 0, err
@@ -721,6 +724,7 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	zap.L().Sugar().Debugf("LastRound: %v\n", result)
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}

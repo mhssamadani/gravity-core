@@ -145,10 +145,9 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	zap.L().Sugar().Debugf("response: %v\n", bodyBytes)
-
 	response := newResponse(resp)
+	body, _ := ioutil.ReadAll(response.Body)
+	zap.L().Sugar().Debugf("response: %v\n", string(body))
 
 	if response.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(response.Body)
