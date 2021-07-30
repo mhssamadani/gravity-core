@@ -11,6 +11,7 @@ import (
 	"github.com/Gravity-Tech/gravity-core/abi"
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"github.com/gookit/validate"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -271,18 +272,22 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "getAddressDetail")
+	zap.L().Debug("getAddressDetail: make request")
 	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
+		zap.L().Error(err.Error())
 		panic(err)
 	}
+	zap.L().Debug("getAddressDetail: Do request")
 	res := new(Response)
 	_, err = adaptor.sigmaClient.Do(ctx, req, res)
 	if err != nil {
+		zap.L().Error(err.Error())
 		panic(err)
 	}
 
 	if !res.Status {
-		err = fmt.Errorf("proxy connection problem")
+		zap.L().Error("proxy connection problem")
 		panic(err)
 	}
 	pk, _ := hex.DecodeString(res.Pk)

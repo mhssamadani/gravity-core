@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -142,6 +143,8 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 		return nil, &RequestError{Err: err}
 	}
 	defer resp.Body.Close()
+
+	zap.L().Sugar().Debugf("response: %v", resp)
 
 	response := newResponse(resp)
 
