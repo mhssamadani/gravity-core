@@ -83,7 +83,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	if err != nil {
 		panic(err)
 	}
-	var res Response
+	res := new(Response)
 	_, err = client.Do(ctx, req, res)
 	if err != nil {
 		panic(err)

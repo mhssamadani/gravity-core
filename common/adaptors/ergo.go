@@ -275,7 +275,7 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	if err != nil {
 		panic(err)
 	}
-	var res Response
+	res := new(Response)
 	_, err = adaptor.ergoClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)

@@ -275,7 +275,7 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	if err != nil {
 		panic(err)
 	}
-	var res Response
+	res := new(Response)
 	_, err = adaptor.sigmaClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
