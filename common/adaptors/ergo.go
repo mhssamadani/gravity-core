@@ -265,29 +265,27 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "getAddressDetail")
-
-	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
-	response, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
-	}
-	var responseObject Response
-	err = json.Unmarshal(response, &responseObject)
+	var res Response
+	_, err = adaptor.ergoClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
 	}
 
-	if !responseObject.Status {
+	if !res.Status {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
-	pk, _ := hex.DecodeString(responseObject.Pk)
+	pk, _ := hex.DecodeString(res.Pk)
 	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
@@ -412,7 +410,7 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 
 	switch SubType(dataType) {
 	case Int64:
-		v , err := strconv.ParseInt(value.Value, 10, 64)
+		v, err := strconv.ParseInt(value.Value, 10, 64)
 		if err != nil {
 			return err
 		}
@@ -434,14 +432,14 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return  err
+		return err
 	}
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
 	if err != nil {
 		return err
 	}
-	return  nil
+	return nil
 }
 
 func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
@@ -707,7 +705,7 @@ func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 
 func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
-		Success   bool   `json:"success"`
+		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")

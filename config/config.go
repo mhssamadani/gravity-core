@@ -2,11 +2,13 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/Gravity-Tech/gravity-core/common/account"
 
@@ -57,47 +59,43 @@ func generateWavesPrivKeys(chain byte) (*Key, error) {
 }
 
 func generateErgoPrivKeys() (*Key, error) {
-
 	type Response struct {
 		Status  bool   `json:"success"`
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	seed := make([]byte, 32)
 	_, err := cryptorand.Read(seed)
 	if err != nil {
 		panic(err)
 	}
 	secret := ergCrypto.NewKeyFromSeed(seed)
+
+	client, _ := ergClient.NewClient()
+
 	values := map[string]string{"sk": hex.EncodeToString(secret)}
-
 	jsonValue, _ := json.Marshal(values)
-	url, err := ergClient.JoinUrl(ergClient.DefaultOptions.BaseUrl, "getAddressDetail")
+	url, _ := ergClient.JoinUrl(client.Options.BaseUrl, "getAddressDetail")
+	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
-	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
-	if err != nil {
-		panic(err)
-	}
-	response, err := ioutil.ReadAll(res.Body)
-
-	if err != nil {
-		panic(err)
-	}
-	var responseObject Response
-	err = json.Unmarshal(response, &responseObject)
+	var res Response
+	_, err = client.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
 	}
 
-	if !responseObject.Status {
+	if !res.Status {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
 	return &Key{
-		Address: responseObject.Address,
-		PubKey:  responseObject.Pk,
+		Address: res.Address,
+		PubKey:  res.Pk,
 		PrivKey: hex.EncodeToString(seed),
 	}, nil
 
@@ -105,7 +103,6 @@ func generateErgoPrivKeys() (*Key, error) {
 
 func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 	validatorPrivKey := ed25519.GenPrivKey()
-
 
 	ethPrivKeys, err := generateEthereumBasedPrivKeys()
 	if err != nil {
@@ -128,13 +125,13 @@ func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 		},
 		TargetChains: map[string]Key{
 			account.Ethereum.String(): *ethPrivKeys,
-			account.Binance.String(): *ethPrivKeys,
-			account.Waves.String(): *wavesPrivKeys,
-			account.Avax.String(): *ethPrivKeys,
-			account.Heco.String(): *ethPrivKeys,
-			account.Fantom.String(): *ethPrivKeys,
-			account.Ergo.String(): *ergoPrivKeys,
-			account.Sigma.String(): *ergoPrivKeys,
+			account.Binance.String():  *ethPrivKeys,
+			account.Waves.String():    *wavesPrivKeys,
+			account.Avax.String():     *ethPrivKeys,
+			account.Heco.String():     *ethPrivKeys,
+			account.Fantom.String():   *ethPrivKeys,
+			account.Ergo.String():     *ergoPrivKeys,
+			account.Sigma.String():    *ergoPrivKeys,
 		},
 	}, nil
 }

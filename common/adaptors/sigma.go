@@ -31,7 +31,7 @@ const (
 type SigmaAdaptor struct {
 	secret crypto.PrivateKey
 
-	SigmaClient      *helpers.ErgClient `option:"ergClient"`
+	sigmaClient     *helpers.ErgClient `option:"sigmaClient"`
 	ghClient        *gravity.Client    `option:"ghClient"`
 	gravityContract string             `option:"gravityContract"`
 }
@@ -53,7 +53,7 @@ func (adaptor *SigmaAdaptor) applyOpts(opts AdapterOptions) error {
 			case "ghClient":
 				adaptor.ghClient = val.(*gravity.Client)
 			case "ergClient":
-				adaptor.SigmaClient = val.(*helpers.ErgClient)
+				adaptor.sigmaClient = val.(*helpers.ErgClient)
 			case "gravityContract":
 				adaptor.gravityContract = val.(string)
 
@@ -105,8 +105,8 @@ func NewSigmaAdapterByOpts(seed []byte, nodeUrl string, ctx context.Context, opt
 	}
 	secret := crypto.NewKeyFromSeed(seed)
 	adapter := &SigmaAdaptor{
-		secret:     secret,
-		SigmaClient: client,
+		secret:      secret,
+		sigmaClient: client,
 	}
 	err = adapter.applyOpts(opts)
 	if err != nil {
@@ -133,8 +133,8 @@ func NewSigmaAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...S
 
 	secret := crypto.NewKeyFromSeed(seed)
 	er := &SigmaAdaptor{
-		SigmaClient: client,
-		secret:     secret,
+		sigmaClient: client,
+		secret:      secret,
 	}
 	for _, opt := range opts {
 		err := opt(er)
@@ -152,7 +152,7 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 	}
 	out := make(chan error)
 	const TxWaitCount = 10
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "numConfirmations")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
@@ -165,14 +165,14 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 				break
 			}
 			response := new(Response)
-			_, err = adaptor.SigmaClient.Do(ctx, req, response)
+			_, err = adaptor.sigmaClient.Do(ctx, req, response)
 			if err != nil {
 				out <- err
 				break
 			}
 
 			if response.Confirm == -1 {
-				_, err = adaptor.SigmaClient.Do(ctx, req, response)
+				_, err = adaptor.sigmaClient.Do(ctx, req, response)
 				if err != nil {
 					out <- err
 					break
@@ -201,7 +201,7 @@ func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 		Status bool   `json:"success"`
 		Height uint64 `json:"height"`
 	}
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "height")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "height")
 	if err != nil {
 		return 0, err
 	}
@@ -211,7 +211,7 @@ func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	response := new(Response)
-	_, err = adaptor.SigmaClient.Do(ctx, req, response)
+	_, err = adaptor.sigmaClient.Do(ctx, req, response)
 	if err != nil {
 		return 0, err
 	}
@@ -230,7 +230,7 @@ func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "sign")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "sign")
 	if err != nil {
 		return nil, err
 	}
@@ -265,29 +265,27 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	url, _ := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "getAddressDetail")
-
-	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
+	url, _ := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "getAddressDetail")
+	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
-	response, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
-	}
-	var responseObject Response
-	err = json.Unmarshal(response, &responseObject)
+	var res Response
+	_, err = adaptor.sigmaClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
 	}
 
-	if !responseObject.Status {
+	if !res.Status {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
-	pk, _ := hex.DecodeString(responseObject.Pk)
+	pk, _ := hex.DecodeString(res.Pk)
 	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
@@ -328,7 +326,7 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 	realSignCount := 0
 
 	// Get oracles and bftValue
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/getPreAddPulseInfo")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/getPreAddPulseInfo")
 	if err != nil {
 		return "", err
 	}
@@ -337,7 +335,7 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 		return "", err
 	}
 	result := new(Result)
-	_, err = adaptor.SigmaClient.Do(ctx, req, result)
+	_, err = adaptor.sigmaClient.Do(ctx, req, result)
 	if err != nil {
 		return "", err
 	}
@@ -379,7 +377,7 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 
 	// Send oracleSigns to be verified by contract in proxy side and get txId
 	data, err := json.Marshal(Data{Signs: Sign{a: signsA, z: signsZ}, Hash: hex.EncodeToString(hash)})
-	url, err = helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/addPulse")
+	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/addPulse")
 	if err != nil {
 		return "", err
 	}
@@ -388,7 +386,7 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 		return "", err
 	}
 	tx := new(Tx)
-	_, err = adaptor.SigmaClient.Do(ctx, req, tx)
+	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
 	if err != nil {
 		return "", err
 	}
@@ -412,7 +410,7 @@ func (adaptor *SigmaAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId 
 
 	switch SubType(dataType) {
 	case Int64:
-		v , err := strconv.ParseInt(value.Value, 10, 64)
+		v, err := strconv.ParseInt(value.Value, 10, 64)
 		if err != nil {
 			return err
 		}
@@ -428,20 +426,20 @@ func (adaptor *SigmaAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId 
 	}
 
 	jsonData, err := json.Marshal(data)
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/sendValueToSubs")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/sendValueToSubs")
 	if err != nil {
 		return err
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return  err
+		return err
 	}
 	tx := new(Tx)
-	_, err = adaptor.SigmaClient.Do(ctx, req, tx)
+	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
 	if err != nil {
 		return err
 	}
-	return  nil
+	return nil
 }
 
 func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
@@ -473,13 +471,13 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	}
 
 	var consuls []string
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/getConsuls")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/getConsuls")
 	if err != nil {
 		return "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	result := new(Consuls)
-	_, err = adaptor.SigmaClient.Do(ctx, req, result)
+	_, err = adaptor.sigmaClient.Do(ctx, req, result)
 	if err != nil {
 		return "", err
 	}
@@ -526,14 +524,14 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
-	url, err = helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/updateOracles")
+	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/updateOracles")
 	if err != nil {
 		return "", err
 	}
 	data, err := json.Marshal(Data{newOracles: newOracles, Signs: Sign{a: signsA, z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
-	_, err = adaptor.SigmaClient.Do(ctx, req, tx)
+	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
 	if err != nil {
 		return "", err
 	}
@@ -570,13 +568,13 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	}
 
 	var consuls []string
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/getConsuls")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/getConsuls")
 	if err != nil {
 		return "", err
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	result := new(Consuls)
-	_, err = adaptor.SigmaClient.Do(ctx, req, result)
+	_, err = adaptor.sigmaClient.Do(ctx, req, result)
 	if err != nil {
 		return "", err
 	}
@@ -628,14 +626,14 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 		newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
 	}
 
-	url, err = helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/updateConsuls")
+	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/updateConsuls")
 	if err != nil {
 		return "", err
 	}
 	data, err := json.Marshal(Data{newConsuls: newConsulsString, Signs: Sign{a: signsA, z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
-	_, err = adaptor.SigmaClient.Do(ctx, req, tx)
+	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
 	if err != nil {
 		return "", err
 	}
@@ -685,7 +683,7 @@ func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.
 		Success bool   `json:"success"`
 		PulseId string `json:"pulse_id"`
 	}
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/getLastPulseId")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/getLastPulseId")
 	if err != nil {
 		return 0, err
 	}
@@ -694,7 +692,7 @@ func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.
 		return 0, err
 	}
 	result := new(Result)
-	_, err = adaptor.SigmaClient.Do(ctx, req, result)
+	_, err = adaptor.sigmaClient.Do(ctx, req, result)
 	if err != nil {
 		return 0, err
 	}
@@ -707,10 +705,10 @@ func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.
 
 func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
-		Success   bool   `json:"success"`
+		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
-	url, err := helpers.JoinUrl(adaptor.SigmaClient.Options.BaseUrl, "adaptor/lastRound")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
 		return 0, err
 	}
@@ -719,7 +717,7 @@ func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 	result := new(Result)
-	_, err = adaptor.SigmaClient.Do(ctx, req, result)
+	_, err = adaptor.sigmaClient.Do(ctx, req, result)
 	if err != nil {
 		return 0, err
 	}
