@@ -708,7 +708,7 @@ func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
 		Success   bool   `json:"success"`
-		LastRound string `json:"lastRound"`
+		LastRound int64 `json:"lastRound"`
 	}
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
@@ -726,8 +726,7 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}
-	lastRound, _ := strconv.ParseUint(result.LastRound, 10, 64)
-	return lastRound, nil
+	return uint64(result.LastRound), nil
 }
 
 func (adaptor *ErgoAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
