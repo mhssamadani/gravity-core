@@ -138,13 +138,15 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	req.Close = true
 	resp, err := options.Doer.Do(req)
 	if err != nil {
 		return nil, &RequestError{Err: err}
 	}
 	defer resp.Body.Close()
 
-	zap.L().Sugar().Debugf("response: %v", resp)
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	zap.L().Sugar().Debugf("response: %v\n", bodyBytes)
 
 	response := newResponse(resp)
 
