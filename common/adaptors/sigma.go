@@ -713,6 +713,7 @@ func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
+	zap.L().Sugar().Debugf("\t\tLastRound\t\t")
 	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
 		return 0, err
@@ -726,6 +727,7 @@ func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
+	zap.L().Sugar().Debugf("LastRound: %v\n", result)
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}
