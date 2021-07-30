@@ -8,11 +8,10 @@ import (
 	"errors"
 
 	"github.com/Gravity-Tech/gravity-core/common/adaptors"
+	"github.com/Gravity-Tech/gravity-core/common/hashing"
 	"go.uber.org/zap"
 
 	"github.com/Gravity-Tech/gravity-core/ledger/scheduler"
-
-	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/Gravity-Tech/gravity-core/common/account"
 	"github.com/Gravity-Tech/gravity-core/common/storage"
@@ -69,17 +68,17 @@ func SetState(tx *transactions.Transaction, store *storage.Storage, adaptors map
 	//scheduler.PublishMessage("example.topic", []byte(fmt.Sprintf("SetState func[%s]", tx.Func)))
 	switch tx.Func {
 	case transactions.Commit:
-		return commit(store, tx)
+		return persistCommit(store, tx)
 	case transactions.Reveal:
-		return reveal(store, tx)
+		return persistReveal(store, tx)
 	case transactions.Result:
-		return result(store, tx)
+		return persistResult(store, tx)
 	case transactions.AddOracleInNebula:
 		return addOracleInNebula(store, tx)
 	case transactions.AddOracle:
 		return addOracle(store, tx)
 	case transactions.NewRound:
-		return newRound(store, tx, height, adaptors, ctx)
+		return persistNewRound(store, tx, height, adaptors, ctx)
 	case transactions.Vote:
 		return vote(store, tx)
 	case transactions.AddNebula:
@@ -103,7 +102,7 @@ func SetState(tx *transactions.Transaction, store *storage.Storage, adaptors map
 	}
 }
 
-func commit(store *storage.Storage, tx *transactions.Transaction) error {
+func persistCommit(store *storage.Storage, tx *transactions.Transaction) error {
 	nebula := account.BytesToNebulaId(tx.Value(0).([]byte))
 	pulseId := tx.Value(1).(int64)
 	tcHeight := tx.Value(2).(int64)
@@ -127,13 +126,14 @@ func commit(store *storage.Storage, tx *transactions.Transaction) error {
 	return nil
 }
 
-func reveal(store *storage.Storage, tx *transactions.Transaction) error {
+func persistReveal(store *storage.Storage, tx *transactions.Transaction) error {
 	commit := tx.Value(0).([]byte)
 	nebula := account.BytesToNebulaId(tx.Value(1).([]byte))
 	pulseId := tx.Value(2).(int64)
 	height := tx.Value(3).(int64)
 	reveal := tx.Value(4).([]byte)
 	pubKeyBytes := tx.Value(5).([]byte)
+	chainType := tx.Value(6).(int64)
 	var pubKey account.OraclesPubKey
 	copy(pubKey[:], pubKeyBytes)
 	zap.L().Sugar().Debug("State reveal", commit, nebula, pulseId, height, reveal, pubKeyBytes)
@@ -148,7 +148,7 @@ func reveal(store *storage.Storage, tx *transactions.Transaction) error {
 			return err
 		}
 
-		expectedHash := crypto.Keccak256(reveal)
+		expectedHash := hashing.WrappedKeccak256(reveal[:], account.ChainType(chainType))
 		if !bytes.Equal(commitBytes, expectedHash[:]) {
 			return ErrInvalidReveal
 		}
@@ -204,7 +204,7 @@ func addOracleInNebula(store *storage.Storage, tx *transactions.Transaction) err
 	return nil
 }
 
-func result(store *storage.Storage, tx *transactions.Transaction) error {
+func persistResult(store *storage.Storage, tx *transactions.Transaction) error {
 	nebulaAddress := account.BytesToNebulaId(tx.Value(0).([]byte))
 	pulseId := tx.Value(1).(int64)
 	signBytes := tx.Value(2).([]byte)
@@ -218,7 +218,7 @@ func result(store *storage.Storage, tx *transactions.Transaction) error {
 	return store.SetResult(nebulaAddress, pulseId, oracles[chainType], signBytes)
 }
 
-func newRound(store *storage.Storage, tx *transactions.Transaction, ledgerHeight uint64, adaptors map[account.ChainType]adaptors.IBlockchainAdaptor, ctx context.Context) error {
+func persistNewRound(store *storage.Storage, tx *transactions.Transaction, ledgerHeight uint64, adaptors map[account.ChainType]adaptors.IBlockchainAdaptor, ctx context.Context) error {
 	chainType := account.ChainType(tx.Value(0).([]byte)[0])
 	tcHeight := tx.Value(1).(int64)
 

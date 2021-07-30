@@ -116,6 +116,7 @@ func (scheduler *Scheduler) processByHeight(height int64) error {
 					"is_sender":  index == int64(consulInfo.ConsulIndex),
 					"chain_type": val.ChainType,
 				}
+				zap.L().Sugar().Debug("Update oracles payload ", payload)
 				PublishMessage("ledger.events", SchedulerEvent{
 					Name:   "update_oracles",
 					Params: payload,
@@ -244,18 +245,25 @@ func (scheduler *Scheduler) signConsulsResult(roundId int64, chainType account.C
 	return nil
 }
 func (scheduler *Scheduler) signOraclesByNebula(roundId int64, nebulaId account.NebulaId, chainType account.ChainType, sender account.OraclesPubKey) error {
-	// _, err := scheduler.client.SignNewOraclesByConsul(scheduler.Ledger.PubKey, chainType, nebulaId, roundId)
-	// if err != nil && err != gravity.ErrValueNotFound {
-	// 	zap.L().Error(err.Error())
-	// 	return err
-	// } else if err == nil {
-	// 	zap.L().Debug("Returning from func signOraclesByNebula")
-	// 	//return nil
-	// }
+	_, err := scheduler.client.SignNewOraclesByConsul(scheduler.Ledger.PubKey, chainType, nebulaId, roundId)
+	if err != nil && err != gravity.ErrValueNotFound {
+		zap.L().Error(err.Error())
+		return err
+	} else if err == nil {
+		zap.L().Debug("Returning from func signOraclesByNebula")
+		//return nil
+	}
 	bftOraclesByNebula, err := scheduler.client.BftOraclesByNebula(chainType, nebulaId)
 	if err != nil {
 		zap.L().Error(err.Error())
 		return err
+	}
+	if len(bftOraclesByNebula) == 0 {
+		bftOraclesByNebula, err = scheduler.client.OraclesByNebula(nebulaId, chainType)
+		if err != nil {
+			zap.L().Error(err.Error())
+			return err
+		}
 	}
 	var newOracles []*account.OraclesPubKey
 	for k, v := range bftOraclesByNebula {
