@@ -132,7 +132,7 @@ func (a *ErgClient) Do(ctx context.Context, req *http.Request, v interface{}) (*
 }
 
 func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interface{}) (*Response, error) {
-	//req = withContext(ctx, req)
+	req = withContext(ctx, req)
 	if req.Header.Get("Accept") == "" {
 		req.Header.Set("Accept", "application/json")
 	}
@@ -159,6 +159,7 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 
 	select {
 	case <-ctx.Done():
+		zap.L().Sugar().Debugf("ctx ended")
 		return response, ctx.Err()
 	default:
 	}
@@ -166,10 +167,12 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	if v != nil {
 		if w, ok := v.(io.Writer); ok {
 			if _, err := io.Copy(w, resp.Body); err != nil {
+				zap.L().Sugar().Debugf("writer error")
 				return nil, err
 			}
 		} else {
 			if err = json.NewDecoder(resp.Body).Decode(v); err != nil {
+				zap.L().Sugar().Debugf("json parse error")
 				return response, &ParseError{Err: err}
 			}
 		}

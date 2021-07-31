@@ -272,12 +272,10 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "getAddressDetail")
-	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
-	if err != nil {
-		panic(err)
-	}
+	req, _ := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
+
 	res := new(Response)
-	_, err = adaptor.ergoClient.Do(ctx, req, res)
+	_, err := adaptor.ergoClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
 	}
