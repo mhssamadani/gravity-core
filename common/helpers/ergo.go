@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/pkg/errors"
-	"io"
+	"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -89,8 +89,8 @@ func NewClient(options ...ErgOptions) (*ErgClient, error) {
 
 func GetDataType(ctx context.Context) (int, error) {
 	type Result struct {
-		Success bool   `json:"success"`
-		DataType int `json:"dataType"`
+		Success  bool `json:"success"`
+		DataType int  `json:"dataType"`
 	}
 	client, err := NewClient()
 	if err != nil {
@@ -137,6 +137,7 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	}
 	req.Header.Set("Content-Type", "application/json")
 
+	req.Close = true
 	resp, err := options.Doer.Do(req)
 	if err != nil {
 		return nil, &RequestError{Err: err}
@@ -144,6 +145,7 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	defer resp.Body.Close()
 
 	response := newResponse(resp)
+	body, _ := ioutil.ReadAll(response.Body)
 
 	if response.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(response.Body)
@@ -155,22 +157,16 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 
 	select {
 	case <-ctx.Done():
+		zap.L().Sugar().Debugf("ctx ended")
 		return response, ctx.Err()
 	default:
 	}
 
 	if v != nil {
-		if w, ok := v.(io.Writer); ok {
-			if _, err := io.Copy(w, resp.Body); err != nil {
-				return nil, err
-			}
-		} else {
-			if err = json.NewDecoder(resp.Body).Decode(v); err != nil {
-				return response, &ParseError{Err: err}
-			}
+		if err = json.Unmarshal(body, v); err != nil {
+			return response, &ParseError{Err: err}
 		}
 	}
-
 	return response, err
 }
 
