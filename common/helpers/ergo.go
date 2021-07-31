@@ -89,8 +89,8 @@ func NewClient(options ...ErgOptions) (*ErgClient, error) {
 
 func GetDataType(ctx context.Context) (int, error) {
 	type Result struct {
-		Success bool   `json:"success"`
-		DataType int `json:"dataType"`
+		Success  bool `json:"success"`
+		DataType int  `json:"dataType"`
 	}
 	client, err := NewClient()
 	if err != nil {
@@ -176,9 +176,15 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	//		}
 	//	}
 	//}
-	if err = json.NewDecoder(response.Body).Decode(v); err != nil {
-		zap.L().Sugar().Debugf("json parse error")
-		return response, &ParseError{Err: err}
+	if v != nil {
+		if err = json.Unmarshal(body, v); err != nil {
+			zap.L().Sugar().Debugf("json parse error")
+			return response, &ParseError{Err: err}
+		}
+		//if err = json.NewDecoder(resp.Body).Decode(v); err != nil {
+		//	zap.L().Sugar().Debugf("json parse error")
+		//	return response, &ParseError{Err: err}
+		//}
 	}
 	return response, err
 }
