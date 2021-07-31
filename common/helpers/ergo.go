@@ -163,28 +163,11 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 	default:
 	}
 
-	//if v != nil {
-	//	if w, ok := v.(io.Writer); ok {
-	//		if _, err := io.Copy(w, resp.Body); err != nil {
-	//			zap.L().Sugar().Debugf("writer error")
-	//			return nil, err
-	//		}
-	//	} else {
-	//		if err = json.NewDecoder(resp.Body).Decode(v); err != nil {
-	//			zap.L().Sugar().Debugf("json parse error")
-	//			return response, &ParseError{Err: err}
-	//		}
-	//	}
-	//}
 	if v != nil {
 		if err = json.Unmarshal(body, v); err != nil {
 			zap.L().Sugar().Debugf("json parse error")
 			return response, &ParseError{Err: err}
 		}
-		//if err = json.NewDecoder(resp.Body).Decode(v); err != nil {
-		//	zap.L().Sugar().Debugf("json parse error")
-		//	return response, &ParseError{Err: err}
-		//}
 	}
 	return response, err
 }
