@@ -450,14 +450,14 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	}
 	type Consuls struct {
 		Success bool     `json:"success"`
-		consuls []string `json:"consuls"`
+		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		a [5]string
-		z [5]string
+		A [5]string
+		Z [5]string
 	}
 	type Data struct {
-		newOracles []string `json:"newOracles"`
+		NewOracles []string `json:"newOracles"`
 		Signs      Sign     `json:"signs"`
 	}
 
@@ -483,7 +483,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	if !result.Success {
 		return "", errors.New("can't get consuls")
 	} else {
-		consuls = result.consuls
+		consuls = result.Consuls
 	}
 
 	for k, sign := range signs {
@@ -527,7 +527,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{newOracles: newOracles, Signs: Sign{a: signsA, z: signsZ}})
+	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
@@ -547,14 +547,14 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	}
 	type Consuls struct {
 		Success bool     `json:"success"`
-		consuls []string `json:"consuls"`
+		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		a [5]string
-		z [5]string
+		A [5]string
+		Z [5]string
 	}
 	type Data struct {
-		newConsuls []string `json:"newConsuls"`
+		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
 	}
 
@@ -580,7 +580,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	if !result.Success {
 		return "", errors.New("can't get consuls")
 	} else {
-		consuls = result.consuls
+		consuls = result.Consuls
 	}
 
 	for k, sign := range signs {
@@ -629,7 +629,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{newConsuls: newConsulsString, Signs: Sign{a: signsA, z: signsZ}})
+	data, err := json.Marshal(Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
