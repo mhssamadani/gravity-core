@@ -550,8 +550,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		A [5]string
-		Z [5]string
+		A [5]string `json:"a"`
+		Z [5]string `json:"z"`
 	}
 	type Data struct {
 		NewConsuls []string `json:"newConsuls"`
@@ -583,10 +583,12 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		consuls = result.Consuls
 	}
 
+	zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		index := -1
+		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, hex.EncodeToString(sign))
 
+		index := -1
 		for i, v := range consuls {
 			if v == pubKey {
 				index = i
@@ -597,8 +599,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		if index == -1 {
 			continue
 		}
-		signsA[index] = string(sign[:66])
-		signsZ[index] = string(sign[66:])
+		signsA[index] = hex.EncodeToString(sign[:66])
+		signsZ[index] = hex.EncodeToString(sign[66:])
 	}
 
 	for i, v := range signsA {
@@ -629,7 +631,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}})
+	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}})
+	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
