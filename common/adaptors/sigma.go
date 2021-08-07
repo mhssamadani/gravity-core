@@ -253,7 +253,9 @@ func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
 		err = fmt.Errorf("proxy connection problem")
 		return nil, err
 	}
-	return []byte(responseObject.Signed.A + responseObject.Signed.Z), nil
+
+	signBytes := []byte(responseObject.Signed.A + responseObject.Signed.Z)
+	return signBytes, nil
 }
 
 func (adaptor *SigmaAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
@@ -272,22 +274,16 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "getAddressDetail")
-	zap.L().Debug("getAddressDetail: make request")
-	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
-	if err != nil {
-		zap.L().Error(err.Error())
-		panic(err)
-	}
-	zap.L().Debug("getAddressDetail: Do request")
+	req, _ := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
+
 	res := new(Response)
-	_, err = adaptor.sigmaClient.Do(ctx, req, res)
+	_, err := adaptor.sigmaClient.Do(ctx, req, res)
 	if err != nil {
-		zap.L().Error(err.Error())
 		panic(err)
 	}
 
 	if !res.Status {
-		zap.L().Error("proxy connection problem")
+		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
 	pk, _ := hex.DecodeString(res.Pk)
@@ -356,15 +352,15 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 	for _, oracle := range oracles {
 		pubKey, err := account.StringToOraclePubKey(oracle, account.Ergo)
 		if err != nil {
-			signsA = append(signsA, hex.EncodeToString([]byte{0}))
-			signsZ = append(signsZ, hex.EncodeToString([]byte{0}))
+			signsA = append(signsA, "")
+			signsZ = append(signsZ, "")
 			continue
 		}
 		sign, err := adaptor.ghClient.Result(account.Ergo, nebulaId, int64(pulseId), pubKey)
 
 		if err != nil {
-			signsA = append(signsA, hex.EncodeToString([]byte{0}))
-			signsZ = append(signsZ, hex.EncodeToString([]byte{0}))
+			signsA = append(signsA, "")
+			signsZ = append(signsZ, "")
 			continue
 		}
 		signsA = append(signsA, string(sign[:66]))
@@ -456,14 +452,14 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	}
 	type Consuls struct {
 		Success bool     `json:"success"`
-		consuls []string `json:"consuls"`
+		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		a [5]string
-		z [5]string
+		A [5]string
+		Z [5]string
 	}
 	type Data struct {
-		newOracles []string `json:"newOracles"`
+		NewOracles []string `json:"newOracles"`
 		Signs      Sign     `json:"signs"`
 	}
 
@@ -489,7 +485,7 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	if !result.Success {
 		return "", errors.New("can't get consuls")
 	} else {
-		consuls = result.consuls
+		consuls = result.Consuls
 	}
 
 	for k, sign := range signs {
@@ -515,15 +511,15 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 			continue
 		}
 
-		signsA[i] = hex.EncodeToString([]byte{0})
-		signsZ[i] = hex.EncodeToString([]byte{0})
+		signsA[i] = ""
+		signsZ[i] = ""
 	}
 
 	var newOracles []string
 
 	for _, v := range oracles {
 		if v == nil {
-			newOracles = append(newOracles, hex.EncodeToString([]byte{0}))
+			newOracles = append(newOracles, "")
 			continue
 		}
 		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
@@ -533,7 +529,7 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{newOracles: newOracles, Signs: Sign{a: signsA, z: signsZ}})
+	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
@@ -553,15 +549,16 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	}
 	type Consuls struct {
 		Success bool     `json:"success"`
-		consuls []string `json:"consuls"`
+		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		a [5]string
-		z [5]string
+		A [5]string `json:"a"`
+		Z [5]string `json:"z"`
 	}
 	type Data struct {
-		newConsuls []string `json:"newConsuls"`
+		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
+		Round      int64    `json:"round"`
 	}
 
 	lastRound, err := adaptor.LastRound(ctx)
@@ -586,13 +583,15 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	if !result.Success {
 		return "", errors.New("can't get consuls")
 	} else {
-		consuls = result.consuls
+		consuls = result.Consuls
 	}
 
+	zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		index := -1
+		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 
+		index := -1
 		for i, v := range consuls {
 			if v == pubKey {
 				index = i
@@ -607,35 +606,55 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 		signsZ[index] = string(sign[66:])
 	}
 
+	// just in debug mode and if one consuls existed
+	if signsA[1] ==  "" {
+		signsA[1] = signsA[0]
+		signsZ[1] = signsZ[0]
+		signsA[2] = signsA[0]
+		signsZ[2] = signsZ[0]
+	}
+
 	for i, v := range signsA {
 		if v != "" {
 			continue
 		}
 
-		signsA[i] = hex.EncodeToString([]byte{0})
-		signsZ[i] = hex.EncodeToString([]byte{0})
+		signsA[i] = strings.Repeat("0", 66)
+		signsZ[i] = "00"
 	}
 
 	var newConsulsString []string
 
-	for _, v := range newConsulsAddresses {
-		if v == nil {
-			newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
-			continue
+	// just in debug mode and if one consuls existed
+	if newConsulsAddresses[1] == nil {
+		for i := 0; i < 3; i++ {
+			newConsulsString = append(newConsulsString, hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo)))
 		}
-		newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		for i := 0; i < 2; i++ {
+			newConsulsString = append(newConsulsString, "")
+		}
+	} else {
+		// in real this must be exist
+		for _, v := range newConsulsAddresses {
+			if v == nil {
+				newConsulsString = append(newConsulsString, "")
+				continue
+			}
+			newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		}
 	}
 
 	emptyCount := ConsulsNumber - len(newConsulsString)
 	for i := 0; i < emptyCount; i++ {
-		newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
+		newConsulsString = append(newConsulsString, "")
 	}
 
 	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/updateConsuls")
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{newConsuls: newConsulsString, Signs: Sign{a: signsA, z: signsZ}})
+	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, Round: round})
+	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.sigmaClient.Do(ctx, req, tx)
@@ -650,14 +669,15 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 	var msg []string
 	for _, v := range consulsAddresses {
 		if v == nil {
-			msg = append(msg, hex.EncodeToString([]byte{0}))
+			msg = append(msg, "")
 			continue
 		}
 		msg = append(msg, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 	msg = append(msg, fmt.Sprintf("%d", roundId))
 
-	sign, err := adaptor.Sign([]byte(strings.Join(msg, ",")))
+	msgHex, _ := hex.DecodeString(strings.Join(msg, ","))
+	sign, err := adaptor.Sign(msgHex)
 	if err != nil {
 		return nil, err
 	}
@@ -669,13 +689,14 @@ func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*a
 	var stringOracles []string
 	for _, v := range oracles {
 		if v == nil {
-			stringOracles = append(stringOracles, hex.EncodeToString([]byte{1}))
+			stringOracles = append(stringOracles, "")
 			continue
 		}
 		stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
-	sign, err := adaptor.Sign([]byte(strings.Join(stringOracles, ",")))
+	oraclesHex, _ := hex.DecodeString(strings.Join(stringOracles, ","))
+	sign, err := adaptor.Sign(oraclesHex)
 	if err != nil {
 		return nil, err
 	}
@@ -714,6 +735,7 @@ func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		LastRound int64 `json:"lastRound"`
 	}
 	zap.L().Sugar().Debugf("\t\tLastRound\t\t")
+
 	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
 		return 0, err

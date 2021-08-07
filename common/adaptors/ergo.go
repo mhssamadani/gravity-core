@@ -253,7 +253,9 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 		err = fmt.Errorf("proxy connection problem")
 		return nil, err
 	}
-	return []byte(responseObject.Signed.A + responseObject.Signed.Z), nil
+
+	signBytes := []byte(responseObject.Signed.A + responseObject.Signed.Z)
+	return signBytes, nil
 }
 
 func (adaptor *ErgoAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
@@ -350,15 +352,15 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	for _, oracle := range oracles {
 		pubKey, err := account.StringToOraclePubKey(oracle, account.Ergo)
 		if err != nil {
-			signsA = append(signsA, hex.EncodeToString([]byte{0}))
-			signsZ = append(signsZ, hex.EncodeToString([]byte{0}))
+			signsA = append(signsA, "")
+			signsZ = append(signsZ, "")
 			continue
 		}
 		sign, err := adaptor.ghClient.Result(account.Ergo, nebulaId, int64(pulseId), pubKey)
 
 		if err != nil {
-			signsA = append(signsA, hex.EncodeToString([]byte{0}))
-			signsZ = append(signsZ, hex.EncodeToString([]byte{0}))
+			signsA = append(signsA, "")
+			signsZ = append(signsZ, "")
 			continue
 		}
 		signsA = append(signsA, string(sign[:66]))
@@ -509,15 +511,15 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 			continue
 		}
 
-		signsA[i] = hex.EncodeToString([]byte{0})
-		signsZ[i] = hex.EncodeToString([]byte{0})
+		signsA[i] = ""
+		signsZ[i] = ""
 	}
 
 	var newOracles []string
 
 	for _, v := range oracles {
 		if v == nil {
-			newOracles = append(newOracles, hex.EncodeToString([]byte{0}))
+			newOracles = append(newOracles, "")
 			continue
 		}
 		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
@@ -556,6 +558,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	type Data struct {
 		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
+		Round      int64    `json:"round"`
 	}
 
 	lastRound, err := adaptor.LastRound(ctx)
@@ -586,7 +589,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, hex.EncodeToString(sign))
+		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 
 		index := -1
 		for i, v := range consuls {
@@ -599,8 +602,16 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		if index == -1 {
 			continue
 		}
-		signsA[index] = hex.EncodeToString(sign[:66])
-		signsZ[index] = hex.EncodeToString(sign[66:])
+		signsA[index] = string(sign[:66])
+		signsZ[index] = string(sign[66:])
+	}
+
+	// just in debug mode and if one consuls existed
+	if signsA[1] == "" {
+		signsA[1] = signsA[0]
+		signsZ[1] = signsZ[0]
+		signsA[2] = signsA[0]
+		signsZ[2] = signsZ[0]
 	}
 
 	for i, v := range signsA {
@@ -608,30 +619,41 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 			continue
 		}
 
-		signsA[i] = hex.EncodeToString([]byte{0})
-		signsZ[i] = hex.EncodeToString([]byte{0})
+		signsA[i] = strings.Repeat("0", 66)
+		signsZ[i] = "00"
 	}
 
 	var newConsulsString []string
 
-	for _, v := range newConsulsAddresses {
-		if v == nil {
-			newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
-			continue
+	// just in debug mode and if one consuls existed
+	if newConsulsAddresses[1] == nil {
+		for i := 0; i < 3; i++ {
+			newConsulsString = append(newConsulsString, hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo)))
 		}
-		newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		for i := 0; i < 2; i++ {
+			newConsulsString = append(newConsulsString, "")
+		}
+	} else {
+		// in real this must be exist
+		for _, v := range newConsulsAddresses {
+			if v == nil {
+				newConsulsString = append(newConsulsString, "")
+				continue
+			}
+			newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		}
 	}
 
 	emptyCount := ConsulsNumber - len(newConsulsString)
 	for i := 0; i < emptyCount; i++ {
-		newConsulsString = append(newConsulsString, hex.EncodeToString([]byte{0}))
+		newConsulsString = append(newConsulsString, "")
 	}
 
 	url, err = helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/updateConsuls")
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}})
+	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, Round: round})
 	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
@@ -647,14 +669,15 @@ func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 	var msg []string
 	for _, v := range consulsAddresses {
 		if v == nil {
-			msg = append(msg, hex.EncodeToString([]byte{0}))
+			msg = append(msg, "")
 			continue
 		}
 		msg = append(msg, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 	msg = append(msg, fmt.Sprintf("%d", roundId))
 
-	sign, err := adaptor.Sign([]byte(strings.Join(msg, ",")))
+	msgHex, _ := hex.DecodeString(strings.Join(msg, ","))
+	sign, err := adaptor.Sign(msgHex)
 	if err != nil {
 		return nil, err
 	}
@@ -666,13 +689,14 @@ func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 	var stringOracles []string
 	for _, v := range oracles {
 		if v == nil {
-			stringOracles = append(stringOracles, hex.EncodeToString([]byte{1}))
+			stringOracles = append(stringOracles, "")
 			continue
 		}
 		stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
-	sign, err := adaptor.Sign([]byte(strings.Join(stringOracles, ",")))
+	oraclesHex, _ := hex.DecodeString(strings.Join(stringOracles, ","))
+	sign, err := adaptor.Sign(oraclesHex)
 	if err != nil {
 		return nil, err
 	}
