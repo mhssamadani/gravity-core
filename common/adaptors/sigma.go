@@ -558,7 +558,6 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	type Data struct {
 		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
-		Round      int64    `json:"round"`
 	}
 
 	lastRound, err := adaptor.LastRound(ctx)
@@ -653,7 +652,7 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, Round: round})
+	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}})
 	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
@@ -676,7 +675,7 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 	}
 	msg = append(msg, fmt.Sprintf("%d", roundId))
 
-	msgHex, _ := hex.DecodeString(strings.Join(msg, ","))
+	msgHex, _ := hex.DecodeString(strings.Join(msg, ""))
 	sign, err := adaptor.Sign(msgHex)
 	if err != nil {
 		return nil, err
@@ -695,7 +694,7 @@ func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*a
 		stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	}
 
-	oraclesHex, _ := hex.DecodeString(strings.Join(stringOracles, ","))
+	oraclesHex, _ := hex.DecodeString(strings.Join(stringOracles, ""))
 	sign, err := adaptor.Sign(oraclesHex)
 	if err != nil {
 		return nil, err
