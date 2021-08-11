@@ -499,8 +499,12 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		consuls = result.Consuls
 	}
 
+	zap.L().Sugar().Debugf("consuls => %v", consuls)
+
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
+		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
+
 		index := -1
 
 		for i, v := range consuls {
@@ -517,23 +521,40 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		signsZ[index] = string(sign[66:])
 	}
 
+	// just in debug mode and if one consuls existed
+	if signsA[1] == "" {
+		signsA[1] = signsA[0]
+		signsZ[1] = signsZ[0]
+		signsA[2] = signsA[0]
+		signsZ[2] = signsZ[0]
+	}
+
 	for i, v := range signsA {
 		if v != "" {
 			continue
 		}
 
-		signsA[i] = ""
-		signsZ[i] = ""
+		signsA[i] = strings.Repeat("0", 66)
+		signsZ[i] = "00"
 	}
 
 	var newOracles []string
 
-	for _, v := range oracles {
-		if v == nil {
-			newOracles = append(newOracles, "")
-			continue
+	if oracles[1] == nil {
+		for i := 0; i < 3; i++ {
+			newOracles = append(newOracles, hex.EncodeToString(oracles[0].ToBytes(account.Ergo)))
 		}
-		newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		for i := 0; i < 2; i++ {
+			newOracles = append(newOracles, DefaultConsul)
+		}
+	} else {
+		for _, v := range oracles {
+			if v == nil {
+				newOracles = append(newOracles, DefaultConsul)
+				continue
+			}
+			newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		}
 	}
 
 	url, err = helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/updateOracles")
@@ -541,6 +562,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		return "", err
 	}
 	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
+	zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
