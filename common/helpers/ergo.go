@@ -102,7 +102,7 @@ func GetDataType(ctx context.Context) (int, error) {
 	}
 	req, err := http.NewRequestWithContext(ctx, "GET", url.String(), nil)
 	result := new(Result)
-	_, err = client.Do(ctx, req, result)
+	_, err = client.Do(req, result)
 	if err != nil {
 		return 0, err
 	}
@@ -116,9 +116,9 @@ func (a ErgClient) GetOptions() ErgOptions {
 	return a.Options
 }
 
-func withContext(ctx context.Context, req *http.Request) *http.Request {
-	return req.WithContext(ctx)
-}
+//func withContext(ctx context.Context, req *http.Request) *http.Request {
+//	return req.WithContext(ctx)
+//}
 
 func newResponse(response *http.Response) *Response {
 	return &Response{
@@ -126,12 +126,11 @@ func newResponse(response *http.Response) *Response {
 	}
 }
 
-func (a *ErgClient) Do(ctx context.Context, req *http.Request, v interface{}) (*Response, error) {
-	return doHttp(ctx, a.Options, req, v)
+func (a *ErgClient) Do(req *http.Request, v interface{}) (*Response, error) {
+	return doHttp(a.Options, req, v)
 }
 
-func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interface{}) (*Response, error) {
-	req = withContext(ctx, req)
+func doHttp(options ErgOptions, req *http.Request, v interface{}) (*Response, error) {
 	if req.Header.Get("Accept") == "" {
 		req.Header.Set("Accept", "application/json")
 	}
@@ -156,12 +155,12 @@ func doHttp(ctx context.Context, options ErgOptions, req *http.Request, v interf
 		}
 	}
 
-	select {
-	case <-ctx.Done():
-		zap.L().Sugar().Debugf("ctx ended")
-		return response, ctx.Err()
-	default:
-	}
+	//select {
+	//case <-ctx.Done():
+	//	zap.L().Sugar().Debugf("ctx ended")
+	//	return response, ctx.Err()
+	//default:
+	//}
 
 	if v != nil {
 		if err = json.Unmarshal(body, v); err != nil {

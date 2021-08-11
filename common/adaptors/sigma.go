@@ -91,33 +91,6 @@ func SigmaAdapterWithGhClient(ghClient *gravity.Client) SigmaAdapterOption {
 	}
 }
 
-func NewSigmaAdapterByOpts(seed []byte, nodeUrl string, ctx context.Context, opts AdapterOptions) (*SigmaAdaptor, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", nodeUrl, nil)
-	if err != nil {
-		return nil, err
-	}
-	client, err := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: nodeUrl})
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = client.Do(req, nil)
-	if err != nil {
-		return nil, err
-	}
-	secret := crypto.NewKeyFromSeed(seed)
-	adapter := &SigmaAdaptor{
-		secret:      secret,
-		sigmaClient: client,
-	}
-	err = adapter.applyOpts(opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return adapter, nil
-}
-
 func NewSigmaAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...SigmaAdapterOption) (*SigmaAdaptor, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", nodeUrl, nil)
 	if err != nil {
