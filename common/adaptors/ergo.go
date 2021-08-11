@@ -224,7 +224,6 @@ func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 }
 
 func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
-	zap.L().Sugar().Debugf("Sign: msg => %v", string(msg))
 	zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
 	zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
 
@@ -563,7 +562,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	}
 	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
 	zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
-	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
+	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
 	if err != nil {
@@ -688,7 +687,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	}
 	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
 	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
-	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
+	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
 	if err != nil {
@@ -726,10 +725,9 @@ func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 	//	}
 	//	msg = append(msg, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	//}
-	var myRound int64
-	myRound = 1
+
 	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(myRound))
+	binary.BigEndian.PutUint64(b, uint64(roundId))
 	msg = append(msg, b...)
 	//msg = append(msg, fmt.Sprintf("%d", myRound))
 
@@ -771,11 +769,6 @@ func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 	//	}
 	//	stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
 	//}
-	var myRound int64
-	myRound = 1
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(myRound))
-	msg = append(msg, b...)
 
 	sign, err := adaptor.Sign(msg)
 	if err != nil {
