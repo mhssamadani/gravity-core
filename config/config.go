@@ -2,15 +2,12 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Gravity-Tech/gravity-core/common/account"
 	"io/ioutil"
 	"net/http"
-	"time"
-
-	"github.com/Gravity-Tech/gravity-core/common/account"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -64,8 +61,6 @@ func generateErgoPrivKeys() (*Key, error) {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	seed := make([]byte, 32)
 	_, err := cryptorand.Read(seed)
@@ -79,12 +74,12 @@ func generateErgoPrivKeys() (*Key, error) {
 	values := map[string]string{"sk": hex.EncodeToString(secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := ergClient.JoinUrl(client.Options.BaseUrl, "getAddressDetail")
-	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
 	res := new(Response)
-	_, err = client.Do(ctx, req, res)
+	_, err = client.Do(req, res)
 	if err != nil {
 		panic(err)
 	}
@@ -96,7 +91,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	return &Key{
 		Address: res.Address,
 		PubKey:  res.Pk,
-		PrivKey: hex.EncodeToString(seed),
+		PrivKey: hex.EncodeToString(secret),
 	}, nil
 
 }
@@ -135,6 +130,7 @@ func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 		},
 	}, nil
 }
+
 func ParseConfig(filename string, config interface{}) error {
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {
