@@ -24,7 +24,7 @@ type ErgOptions struct {
 
 var DefaultOptions = ErgOptions{
 	BaseUrl: "http://176.9.65.58:9016/",
-	Doer:    &http.Client{Timeout: 3 * time.Second},
+	Doer:    &http.Client{Timeout: 10 * time.Second},
 }
 
 type ErgClient struct {

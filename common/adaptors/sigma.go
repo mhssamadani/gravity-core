@@ -3,6 +3,7 @@ package adaptors
 import (
 	"bytes"
 	"context"
+	crypto "crypto/ed25519"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
@@ -10,6 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/Gravity-Tech/gravity-core/abi"
+	"github.com/Gravity-Tech/gravity-core/common/account"
+	"github.com/Gravity-Tech/gravity-core/common/gravity"
+	"github.com/Gravity-Tech/gravity-core/common/helpers"
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"github.com/gookit/validate"
 	"go.uber.org/zap"
@@ -19,11 +23,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	crypto "crypto/ed25519"
-	"github.com/Gravity-Tech/gravity-core/common/account"
-	"github.com/Gravity-Tech/gravity-core/common/gravity"
-	"github.com/Gravity-Tech/gravity-core/common/helpers"
 )
 
 const (
@@ -121,24 +120,25 @@ func NewSigmaAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...S
 }
 
 func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
+	zap.L().Sugar().Debugf("WaitTx sigma TxID: %s", id)
 	type Response struct {
 		Status  bool `json:"success"`
 		Confirm int  `json:"numConfirmations"`
 	}
 	out := make(chan error)
-	const TxWaitCount = 10
+	const TxWaitCount = 5
 	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
 	go func() {
 		defer close(out)
+		req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/"+id, nil)
+		if err != nil {
+			out <- err
+		}
+		isFounded := false
 		for i := 0; i <= TxWaitCount; i++ {
-			req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/:"+id, nil)
-			if err != nil {
-				out <- err
-				break
-			}
 			response := new(Response)
 			_, err = adaptor.sigmaClient.Do(req, response)
 			if err != nil {
@@ -147,25 +147,15 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 			}
 
 			if response.Confirm == -1 {
-				_, err = adaptor.sigmaClient.Do(req, response)
-				if err != nil {
-					out <- err
-					break
-				}
-
-				if response.Confirm == -1 {
-					out <- errors.New("tx not found")
-					break
-				} else {
-					break
-				}
-			}
-
-			if TxWaitCount == i {
-				out <- errors.New("tx not found")
+				time.Sleep(time.Second * 60)
+				continue
+			} else if response.Confirm >= 0 {
+				isFounded = true
 				break
 			}
-			time.Sleep(time.Second)
+		}
+		if !isFounded {
+			out <- errors.New("tx not found")
 		}
 	}()
 	return <-out
@@ -561,7 +551,6 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
 		RoundId    int64    `json:"roundId"`
-
 	}
 
 	lastRound, err := adaptor.LastRound(ctx)
@@ -725,7 +714,7 @@ func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*a
 	} else {
 		// in real this must be exist
 		for _, v := range oracles {
-			if v == nil 																																																																																																																																																																																																																																																		{
+			if v == nil {
 				msg = append(msg, DefaultOracleByte...)
 				continue
 			}

@@ -150,24 +150,25 @@ func NewErgoAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...Er
 }
 
 func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
+	zap.L().Sugar().Debugf("WaitTx TxID: %s", id)
 	type Response struct {
 		Status  bool `json:"success"`
 		Confirm int  `json:"numConfirmations"`
 	}
 	out := make(chan error)
-	const TxWaitCount = 10
+	const TxWaitCount = 5
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
 	go func() {
 		defer close(out)
+		req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/"+id, nil)
+		if err != nil {
+			out <- err
+		}
+		isFounded := false
 		for i := 0; i <= TxWaitCount; i++ {
-			req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/:"+id, nil)
-			if err != nil {
-				out <- err
-				break
-			}
 			response := new(Response)
 			_, err = adaptor.ergoClient.Do(req, response)
 			if err != nil {
@@ -176,25 +177,14 @@ func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
 			}
 
 			if response.Confirm == -1 {
-				_, err = adaptor.ergoClient.Do(req, response)
-				if err != nil {
-					out <- err
-					break
-				}
-
-				if response.Confirm == -1 {
-					out <- errors.New("tx not found")
-					break
-				} else {
-					break
-				}
+				time.Sleep(time.Second * 60)
+				continue
+			} else if response.Confirm >= 0 {
+				isFounded = true
 			}
-
-			if TxWaitCount == i {
-				out <- errors.New("tx not found")
-				break
-			}
-			time.Sleep(time.Second)
+		}
+		if !isFounded {
+			out <- errors.New("tx not found")
 		}
 	}()
 	return <-out
@@ -754,7 +744,7 @@ func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 	} else {
 		// in real this must be exist
 		for _, v := range oracles {
-			if v == nil 																																																																																																																																																																																																																																																		{
+			if v == nil {
 				msg = append(msg, DefaultOracleByte...)
 				continue
 			}
