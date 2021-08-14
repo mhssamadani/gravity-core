@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -145,7 +146,8 @@ func doHttp(options ErgOptions, req *http.Request, v interface{}) (*Response, er
 
 	response := newResponse(resp)
 	body, _ := ioutil.ReadAll(response.Body)
-	zap.L().Sugar().Debugf("response: %v\n", string(body))
+	urlSlice := strings.Split(req.URL.String(), "/")
+	zap.L().Sugar().Debugf("\n%s, response: %v\n", urlSlice[len(urlSlice)-1], string(body))
 
 	if response.StatusCode != http.StatusOK {
 		body, _ := ioutil.ReadAll(response.Body)

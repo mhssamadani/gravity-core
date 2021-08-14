@@ -126,36 +126,50 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 		Confirm int  `json:"numConfirmations"`
 	}
 	out := make(chan error)
-	const TxWaitCount = 5
+	const TxWaitCount = 10
 	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "numConfirmations")
 	if err != nil {
 		out <- err
 	}
 	go func() {
 		defer close(out)
+		isFounded := false
 		req, err := http.NewRequestWithContext(ctx, "GET", url.String()+"/"+id, nil)
 		if err != nil {
 			out <- err
 		}
-		isFounded := false
-		for i := 0; i <= TxWaitCount; i++ {
-			response := new(Response)
-			_, err = adaptor.sigmaClient.Do(req, response)
-			if err != nil {
-				out <- err
-				break
-			}
-
-			if response.Confirm == -1 {
-				time.Sleep(time.Second * 60)
-				continue
-			} else if response.Confirm >= 0 {
-				isFounded = true
-				break
+		response := new(Response)
+		_, err = adaptor.sigmaClient.Do(req, response)
+		if err != nil {
+			out <- err
+		}
+		if response.Confirm > 0 {
+			isFounded = true
+		}
+		if response.Confirm <= 0 {
+			time.Sleep(time.Second * 60)
+			for {
+				response := new(Response)
+				_, err = adaptor.sigmaClient.Do(req, response)
+				if err != nil {
+					out <- err
+					break
+				}
+				if response.Confirm == -1 {
+					out <- errors.New(fmt.Sprintf("sigma, tx not found: %s", id))
+					break
+				}
+				if response.Confirm == 0 {
+					time.Sleep(time.Second * 60 * 2)
+					continue
+				} else if response.Confirm > 0 {
+					isFounded = true
+					break
+				}
 			}
 		}
 		if !isFounded {
-			out <- errors.New("tx not found")
+			out <- errors.New(fmt.Sprintf("sigma, tx not found: %s", id))
 		}
 	}()
 	return <-out
