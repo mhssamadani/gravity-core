@@ -78,21 +78,18 @@ func validateErgoAdapterOptions(opts AdapterOptions) error {
 	}
 	return nil
 }
-
 func WithErgoGravityContract(address string) ErgoAdapterOption {
 	return func(h *ErgoAdaptor) error {
 		h.gravityContract = address
 		return nil
 	}
 }
-
 func ErgoAdapterWithGhClient(ghClient *gravity.Client) ErgoAdapterOption {
 	return func(h *ErgoAdaptor) error {
 		h.ghClient = ghClient
 		return nil
 	}
 }
-
 func NewErgoAdapterByOpts(seed []byte, nodeUrl string, ctx context.Context, opts AdapterOptions) (*ErgoAdaptor, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", nodeUrl, nil)
 	if err != nil {
@@ -119,7 +116,6 @@ func NewErgoAdapterByOpts(seed []byte, nodeUrl string, ctx context.Context, opts
 
 	return adapter, nil
 }
-
 func NewErgoAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...ErgoAdapterOption) (*ErgoAdaptor, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", nodeUrl, nil)
 	if err != nil {
@@ -204,7 +200,6 @@ func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
 	}()
 	return <-out
 }
-
 func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	type Response struct {
 		Status bool   `json:"success"`
@@ -227,7 +222,6 @@ func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 
 	return response.Height, nil
 }
-
 func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
 	zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
@@ -273,11 +267,9 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	signBytes := []byte(signString)
 	return signBytes, nil
 }
-
 func (adaptor *ErgoAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
 	return adaptor.Sign(hash)
 }
-
 func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	type Response struct {
 		Status  bool   `json:"success"`
@@ -304,7 +296,6 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
-
 func (adaptor *ErgoAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
 	dataType, err := helpers.GetDataType(ctx)
 	if err != nil {
@@ -408,7 +399,6 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 
 	return tx.TxId, nil
 }
-
 func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId uint64, value *extractor.Data, ctx context.Context) error {
 	type Tx struct {
 		Success bool   `json:"success"`
@@ -576,7 +566,6 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 
 	return tx.TxId, nil
 }
-
 func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
 	var signsA [5]string
 	var signsZ [5]string
@@ -701,7 +690,6 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 
 	return tx.TxId, nil
 }
-
 func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultConsulByte, _ := hex.DecodeString(DefaultConsul)
@@ -745,7 +733,6 @@ func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 
 	return sign, err
 }
-
 func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultOracleByte, _ := hex.DecodeString(DefaultOracle)
@@ -807,7 +794,6 @@ func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 	pulseId, _ := strconv.ParseUint(result.PulseId, 10, 64)
 	return pulseId, nil
 }
-
 func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
 		Success   bool  `json:"success"`
@@ -834,7 +820,6 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	}
 	return uint64(result.LastRound), nil
 }
-
 func (adaptor *ErgoAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
 	lastRound, err := adaptor.LastRound(ctx)
 	if err != nil {

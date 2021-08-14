@@ -75,21 +75,18 @@ func validateSigmaAdapterOptions(opts AdapterOptions) error {
 	}
 	return nil
 }
-
 func WithSigmaGravityContract(address string) SigmaAdapterOption {
 	return func(h *SigmaAdaptor) error {
 		h.gravityContract = address
 		return nil
 	}
 }
-
 func SigmaAdapterWithGhClient(ghClient *gravity.Client) SigmaAdapterOption {
 	return func(h *SigmaAdaptor) error {
 		h.ghClient = ghClient
 		return nil
 	}
 }
-
 func NewSigmaAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...SigmaAdapterOption) (*SigmaAdaptor, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", nodeUrl, nil)
 	if err != nil {
@@ -174,7 +171,6 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 	}()
 	return <-out
 }
-
 func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	type Response struct {
 		Status bool   `json:"success"`
@@ -197,7 +193,6 @@ func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 
 	return response.Height, nil
 }
-
 func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
 	zap.L().Sugar().Debugf("Sign: msgHex sigma => %v", hex.EncodeToString(msg))
 	zap.L().Sugar().Debugf("Sign: msgByte sigma => %v", msg)
@@ -242,11 +237,9 @@ func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
 	signBytes := []byte(signString)
 	return signBytes, nil
 }
-
 func (adaptor *SigmaAdaptor) SignHash(nebulaId account.NebulaId, intervalId uint64, pulseId uint64, hash []byte) ([]byte, error) {
 	return adaptor.Sign(hash)
 }
-
 func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	type Response struct {
 		Status  bool   `json:"success"`
@@ -273,7 +266,6 @@ func (adaptor *SigmaAdaptor) PubKey() account.OraclesPubKey {
 	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Sigma)
 	return oraclePubKey
 }
-
 func (adaptor *SigmaAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
 	dataType, err := helpers.GetDataType(ctx)
 	if err != nil {
@@ -377,7 +369,6 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 
 	return tx.TxId, nil
 }
-
 func (adaptor *SigmaAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId uint64, value *extractor.Data, ctx context.Context) error {
 	type Tx struct {
 		Success bool   `json:"success"`
@@ -545,7 +536,6 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 
 	return tx.TxId, nil
 }
-
 func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
 	var signsA [5]string
 	var signsZ [5]string
@@ -670,7 +660,6 @@ func (adaptor *SigmaAdaptor) SendConsulsToGravityContract(newConsulsAddresses []
 
 	return tx.TxId, nil
 }
-
 func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultConsulByte, _ := hex.DecodeString(DefaultConsul)
@@ -714,7 +703,6 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 
 	return sign, err
 }
-
 func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultOracleByte, _ := hex.DecodeString(DefaultOracle)
@@ -776,7 +764,6 @@ func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.
 	pulseId, _ := strconv.ParseUint(result.PulseId, 10, 64)
 	return pulseId, nil
 }
-
 func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
 		Success   bool  `json:"success"`
@@ -803,7 +790,6 @@ func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	}
 	return uint64(result.LastRound), nil
 }
-
 func (adaptor *SigmaAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
 	lastRound, err := adaptor.LastRound(ctx)
 	if err != nil {
