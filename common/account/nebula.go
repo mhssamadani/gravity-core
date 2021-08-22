@@ -1,6 +1,7 @@
 package account
 
 import (
+	"encoding/hex"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/wavesplatform/gowaves/pkg/crypto"
@@ -12,7 +13,6 @@ const (
 	EthereumAddressLength = 20
 	BSCAddressLength      = 20
 	WavesAddressLength    = 26
-	ErgoAddressLength     = 20
 )
 
 type NebulaId [NebulaIdLength]byte
@@ -30,8 +30,15 @@ func StringToNebulaId(address string, chainType ChainType) (NebulaId, error) {
 	case Waves:
 		nebulaBytes := crypto.MustBytesFromBase58(address)
 		nebula = BytesToNebulaId(nebulaBytes)
-	case Solana, Ergo, Sigma:
+	case Solana:
 		nebulaBytes := base58.Decode(address)
+		nebula = BytesToNebulaId(nebulaBytes)
+		zap.L().Sugar().Debug("NebulaId: ", nebula)
+	case Ergo, Sigma:
+		nebulaBytes, err := hex.DecodeString(address)
+		if err != nil {
+			return NebulaId{}, err
+		}
 		nebula = BytesToNebulaId(nebulaBytes)
 		zap.L().Sugar().Debug("NebulaId: ", nebula)
 	}
@@ -55,10 +62,12 @@ func (id NebulaId) ToString(chainType ChainType) string {
 	switch chainType {
 	case Ethereum, Binance, Heco, Fantom, Avax, Polygon:
 		return hexutil.Encode(nebula[:])
-	case Waves, Ergo, Sigma:
+	case Waves:
 		return base58.Encode(nebula[:])
 	case Solana:
 		return base58.Encode(nebula[:])
+	case Ergo, Sigma:
+		return hex.EncodeToString(nebula[:])
 	}
 
 	return ""
@@ -74,7 +83,7 @@ func (id NebulaId) ToBytes(chainType ChainType) []byte {
 	case Solana:
 		return id[:]
 	case Ergo, Sigma:
-		return id[NebulaIdLength-ErgoAddressLength:]
+		return id[:]
 	}
 
 	return nil
