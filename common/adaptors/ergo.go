@@ -12,7 +12,7 @@ import (
 	"github.com/Gravity-Tech/gravity-core/abi"
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"github.com/gookit/validate"
-	"go.uber.org/zap"
+	//"go.uber.org/zap"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -146,7 +146,7 @@ func NewErgoAdapter(seed []byte, nodeUrl string, ctx context.Context, opts ...Er
 }
 
 func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
-	zap.L().Sugar().Debugf("WaitTx sigma TxID: %s", id)
+	// zap.L().Sugar().Debugf("WaitTx sigma TxID: %s", id)
 	type Response struct {
 		Status  bool `json:"success"`
 		Confirm int  `json:"numConfirmations"`
@@ -173,7 +173,7 @@ func (adaptor *ErgoAdaptor) WaitTx(id string, ctx context.Context) error {
 			isFounded = true
 		}
 		if response.Confirm <= 0 {
-			time.Sleep(time.Second * 60)
+			time.Sleep(time.Second * 90)
 			for {
 				response := new(Response)
 				_, err = adaptor.ergoClient.Do(req, response)
@@ -223,8 +223,8 @@ func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	return response.Height, nil
 }
 func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
-	zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
-	zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
+	// zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
+	// zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
 
 	type Sign struct {
 		A string `json:"a"`
@@ -241,7 +241,7 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	zap.L().Sugar().Debugf("sign Data => %v", bytes.NewBuffer(jsonValue))
+	// zap.L().Sugar().Debugf("sign Data => %v", bytes.NewBuffer(jsonValue))
 
 	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
@@ -263,7 +263,7 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 
 	signString := responseObject.Signs.A + responseObject.Signs.Z
-	zap.L().Sugar().Debugf("sign result => %v", signString)
+	// zap.L().Sugar().Debugf("sign result => %v", signString)
 	signBytes := []byte(signString)
 	return signBytes, nil
 }
@@ -493,11 +493,11 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		consuls = result.Consuls
 	}
 
-	zap.L().Sugar().Debugf("consuls => %v", consuls)
+	// zap.L().Sugar().Debugf("consuls => %v", consuls)
 
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
+		// zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 
 		index := -1
 
@@ -537,7 +537,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	if oracles[1] == nil {
 		if oracles[0] == nil {
 			for i := 0; i < 3; i++ {
-				newOracles = append(newOracles, strings.Repeat("0", 66))
+				newOracles = append(newOracles, DefaultConsul)
 			}
 		} else {
 			for i := 0; i < 3; i++ {
@@ -562,7 +562,7 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		return "", err
 	}
 	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
-	zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
+	// zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
@@ -618,10 +618,10 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		consuls = result.Consuls
 	}
 
-	zap.L().Sugar().Debugf("Consuls => %v", consuls)
+	// zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
+		// zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 
 		index := -1
 		for i, v := range consuls {
@@ -686,7 +686,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		return "", err
 	}
 	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
-	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
+	// zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
@@ -735,18 +735,18 @@ func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKe
 	if err != nil {
 		return nil, err
 	}
-	zap.L().Sugar().Debugf("SignConsuls erg => %v", string(sign))
+	// zap.L().Sugar().Debugf("SignConsuls erg => %v", string(sign))
 
 	return sign, err
 }
 func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultOracleByte, _ := hex.DecodeString(DefaultOracle)
-	zeroByte, _ := hex.DecodeString(strings.Repeat("0", 66))
+	//zeroByte, _ := hex.DecodeString(strings.Repeat("0", 66))
 	if oracles[1] == nil {
 		if oracles[0] == nil {
 			for i := 0; i < 3; i++ {
-				msg = append(msg, zeroByte...)
+				msg = append(msg, DefaultOracleByte...)
 			}
 		} else {
 			for i := 0; i < 3; i++ {
@@ -812,7 +812,7 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
-	zap.L().Sugar().Debugf("\t\tLastRound\t\t")
+	// zap.L().Sugar().Debugf("\t\tLastRound\t\t")
 
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
@@ -827,7 +827,7 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	zap.L().Sugar().Debugf("LastRound: %v\n", result)
+	// zap.L().Sugar().Debugf("LastRound: %v\n", result)
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}

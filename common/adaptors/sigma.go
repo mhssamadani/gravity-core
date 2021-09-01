@@ -144,7 +144,7 @@ func (adaptor *SigmaAdaptor) WaitTx(id string, ctx context.Context) error {
 			isFounded = true
 		}
 		if response.Confirm <= 0 {
-			time.Sleep(time.Second * 60)
+			time.Sleep(time.Second * 90)
 			for {
 				response := new(Response)
 				_, err = adaptor.sigmaClient.Do(req, response)

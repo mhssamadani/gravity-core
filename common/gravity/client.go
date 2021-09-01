@@ -394,6 +394,8 @@ func (client *Client) do(path query.Path, rq interface{}) ([]byte, error) {
 		}
 	}
 
+
+	//zap.L().Sugar().Debugf("ABCIQuery: path => %v\nb => %v", string(path), hex.EncodeToString(b))
 	rs, err := client.HttpClient.ABCIQuery(string(path), b)
 	if err != nil {
 		return nil, err
