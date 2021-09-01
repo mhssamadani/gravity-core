@@ -25,7 +25,7 @@ type ErgOptions struct {
 
 var DefaultOptions = ErgOptions{
 	BaseUrl: "http://176.9.65.58:9016/",
-	Doer:    &http.Client{Timeout: 30 * time.Second},
+	Doer:    &http.Client{Timeout: 60 * time.Second},
 }
 
 type ErgClient struct {
@@ -97,7 +97,7 @@ func GetDataType(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	url, err := JoinUrl(client.Options.BaseUrl, "adaptor/getDataType")
+	url, err := JoinUrl(client.Options.BaseUrl, "adpator/getDataType")
 	if err != nil {
 		return 0, err
 	}

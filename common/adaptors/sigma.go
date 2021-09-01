@@ -271,7 +271,7 @@ func (adaptor *SigmaAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Co
 	if err != nil {
 		return 0, err
 	}
-	return abi.ExtractorType(dataType), nil
+	return abi.ExtractorType(uint8(dataType)), nil
 }
 
 func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
@@ -401,7 +401,7 @@ func (adaptor *SigmaAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId 
 	}
 
 	jsonData, err := json.Marshal(data)
-	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/sendValueToSubs")
+	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adpator/sendValueToSubs")
 	if err != nil {
 		return err
 	}
@@ -505,8 +505,14 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 	var newOracles []string
 
 	if oracles[1] == nil {
-		for i := 0; i < 3; i++ {
-			newOracles = append(newOracles, hex.EncodeToString(oracles[0].ToBytes(account.Ergo)))
+		if oracles[0] == nil {
+			for i := 0; i < 3; i++ {
+				newOracles = append(newOracles, strings.Repeat("0", 66))
+			}
+		} else {
+			for i := 0; i < 3; i++ {
+				newOracles = append(newOracles, hex.EncodeToString(oracles[0].ToBytes(account.Ergo)))
+			}
 		}
 		for i := 0; i < 2; i++ {
 			newOracles = append(newOracles, DefaultConsul)
@@ -706,9 +712,16 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
 	DefaultOracleByte, _ := hex.DecodeString(DefaultOracle)
+	zeroByte, _ := hex.DecodeString(strings.Repeat("0", 66))
 	if oracles[1] == nil {
-		for i := 0; i < 3; i++ {
-			msg = append(msg, oracles[0].ToBytes(account.Ergo)...)
+		if oracles[0] == nil{
+			for i := 0; i < 3; i++ {
+				msg = append(msg, zeroByte...)
+			}
+		}else{
+			for i := 0; i < 3; i++ {
+				msg = append(msg, oracles[0].ToBytes(account.Ergo)...)
+			}
 		}
 		for i := 0; i < 2; i++ {
 			msg = append(msg, DefaultOracleByte...)

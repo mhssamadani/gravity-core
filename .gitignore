@@ -42,3 +42,5 @@ cmd/gravity/gravity
 /coverage.json
 /coverage/
 *DS_Store
+out/
+write-file*
