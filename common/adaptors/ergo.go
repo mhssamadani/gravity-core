@@ -12,7 +12,8 @@ import (
 	"github.com/Gravity-Tech/gravity-core/abi"
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"github.com/gookit/validate"
-	//"go.uber.org/zap"
+	"go.uber.org/zap"
+
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -27,9 +28,11 @@ import (
 )
 
 const (
-	ConsulsNumber = 5
-	DefaultConsul = "038179cc7a2358f9489b629ede2304c4eebf71c9e42a246e87d31bee71a737fd8a"
-	DefaultOracle = "02cd0b9784f67d4ad2def93d3b485790e8f2cebfd129606601b20f9f4f90e6d021"
+	ConsulsNumber  = 5
+	OraclessNumber = 5
+	DefaultConsul  = "038179cc7a2358f9489b629ede2304c4eebf71c9e42a246e87d31bee71a737fd8a"
+	//DefaultValidOracle = "02cd0b9784f67d4ad2def93d3b485790e8f2cebfd129606601b20f9f4f90e6d021"
+	DefaultOracle = "032ff0e8783d73c2d711158140be0a10123f8793ba7b42d59fd349793049e2103e"
 )
 
 type ErgoAdaptor struct {
@@ -223,8 +226,9 @@ func (adaptor *ErgoAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	return response.Height, nil
 }
 func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
-	// zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
-	// zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
+	zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
+	zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
+	zap.L().Sugar().Debugf("Sign: msg => %v", string(msg))
 
 	type Sign struct {
 		A string `json:"a"`
@@ -241,7 +245,7 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// zap.L().Sugar().Debugf("sign Data => %v", bytes.NewBuffer(jsonValue))
+	zap.L().Sugar().Debugf("sign Data => %v", bytes.NewBuffer(jsonValue))
 
 	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
@@ -448,8 +452,6 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 }
 
 func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
-	var signsA [5]string
-	var signsZ [5]string
 	type Tx struct {
 		Success bool   `json:"success"`
 		TxId    string `json:"txId"`
@@ -459,8 +461,8 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		A [5]string
-		Z [5]string
+		A []string `json:"a"`
+		Z []string `json:"z"`
 	}
 	type Data struct {
 		NewOracles []string `json:"newOracles"`
@@ -494,20 +496,19 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	}
 
 	// zap.L().Sugar().Debugf("consuls => %v", consuls)
+	var signsA = make([]string, len(consuls), len(consuls))
+	var signsZ = make([]string, len(consuls), len(consuls))
 
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
 		// zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
-
 		index := -1
-
 		for i, v := range consuls {
 			if v == pubKey {
 				index = i
 				break
 			}
 		}
-
 		if index == -1 {
 			continue
 		}
@@ -516,44 +517,29 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 	}
 
 	// just in debug mode and if one consuls existed
-	if signsA[1] == "" {
-		signsA[1] = signsA[0]
-		signsZ[1] = signsZ[0]
-		signsA[2] = signsA[0]
-		signsZ[2] = signsZ[0]
+	for i := 1; i < len(oracles); i++ {
+		if signsA[i] == ""{
+			if i <= 2{
+				signsA[i] = signsA[i-1]
+				signsZ[i] = signsZ[i-1]
+			}else{
+				signsA[i] = strings.Repeat("0", 66)
+				signsZ[i] = "00"
+			}
+		}
 	}
 
-	for i, v := range signsA {
-		if v != "" {
-			continue
-		}
+	var newOracles = make([]string, len(oracles), len(oracles))
 
-		signsA[i] = strings.Repeat("0", 66)
-		signsZ[i] = "00"
-	}
-
-	var newOracles []string
-
-	if oracles[1] == nil {
-		if oracles[0] == nil {
-			for i := 0; i < 3; i++ {
-				newOracles = append(newOracles, DefaultConsul)
+	for i := 0; i < len(oracles); i++ {
+		if oracles[i] == nil{
+			if i == 0{
+				newOracles[i] = DefaultOracle
+			}else{
+				newOracles[i] = newOracles[i-1]
 			}
-		} else {
-			for i := 0; i < 3; i++ {
-				newOracles = append(newOracles, hex.EncodeToString(oracles[0].ToBytes(account.Ergo)))
-			}
-		}
-		for i := 0; i < 2; i++ {
-			newOracles = append(newOracles, DefaultConsul)
-		}
-	} else {
-		for _, v := range oracles {
-			if v == nil {
-				newOracles = append(newOracles, DefaultConsul)
-				continue
-			}
-			newOracles = append(newOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		}else{
+			newOracles[i] = hex.EncodeToString(oracles[i].ToBytes(account.Ergo))
 		}
 	}
 
@@ -562,19 +548,20 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		return "", err
 	}
 	data, err := json.Marshal(Data{NewOracles: newOracles, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
-	// zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
+	zap.L().Sugar().Debugf("updateOracles: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
 	if err != nil {
 		return "", err
 	}
+	if !tx.Success {
+		return "", err
+	}
 
 	return tx.TxId, nil
 }
 func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
-	var signsA [5]string
-	var signsZ [5]string
 	type Tx struct {
 		Success bool   `json:"success"`
 		TxId    string `json:"txId"`
@@ -584,8 +571,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
-		A [5]string `json:"a"`
-		Z [5]string `json:"z"`
+		A []string `json:"a"`
+		Z []string `json:"z"`
 	}
 	type Data struct {
 		NewConsuls []string `json:"newConsuls"`
@@ -618,6 +605,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		consuls = result.Consuls
 	}
 
+	var signsA = make([]string, len(consuls), len(consuls))
+	var signsZ = make([]string, len(consuls), len(consuls))
 	// zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
@@ -639,40 +628,37 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	}
 
 	// just in debug mode and if one consuls existed
-	if signsA[1] == "" {
-		signsA[1] = signsA[0]
-		signsZ[1] = signsZ[0]
-		signsA[2] = signsA[0]
-		signsZ[2] = signsZ[0]
-	}
-
-	for i, v := range signsA {
-		if v != "" {
-			continue
-		}
-
-		signsA[i] = strings.Repeat("0", 66)
-		signsZ[i] = "00"
-	}
-
-	var newConsulsString []string
-
-	// just in debug mode and if one consuls existed
-	if newConsulsAddresses[1] == nil {
-		for i := 0; i < 3; i++ {
-			newConsulsString = append(newConsulsString, hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo)))
-		}
-		for i := 0; i < 2; i++ {
-			newConsulsString = append(newConsulsString, DefaultConsul)
-		}
-	} else {
-		// in real this must be exist
-		for _, v := range newConsulsAddresses {
-			if v == nil {
-				newConsulsString = append(newConsulsString, DefaultConsul)
-				continue
+	for i := 1; i < len(consuls); i++ {
+		if signsA[i] == "" {
+			if i == 1 {
+				signsA[i] = signsA[i-1]
+				signsA[i+1] = signsA[i-1]
+				signsZ[i] = signsZ[i-1]
+				signsZ[i+1] = signsZ[i-1]
+			} else if i == 2 {
+				signsA[i] = signsA[i-1]
+				signsZ[i] = signsZ[i-1]
+			} else {
+				signsA[i] = strings.Repeat("0", 66)
+				signsZ[i] = "00"
 			}
-			newConsulsString = append(newConsulsString, hex.EncodeToString(v.ToBytes(account.Ergo)))
+		}
+	}
+
+	var newConsulsString = make([]string, ConsulsNumber, ConsulsNumber)
+	// just in debug mode and if one consuls existed
+	for i := 0; i < len(newConsulsAddresses); i++ {
+		if newConsulsAddresses[i] == nil{
+			if i == 1{
+				newConsulsString[i] = hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo))
+				newConsulsString[i+1] = hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo))
+			}else if i == 2 && newConsulsAddresses[i-1] != nil{
+				newConsulsString[i] = newConsulsString[i-1]
+			}else if i >2{
+				newConsulsString[i] = DefaultConsul
+			}
+		}else{
+			newConsulsString[i] = hex.EncodeToString(newConsulsAddresses[i].ToBytes(account.Ergo))
 		}
 	}
 
@@ -686,36 +672,59 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 		return "", err
 	}
 	data, err := json.Marshal(&Data{NewConsuls: newConsulsString, Signs: Sign{A: signsA, Z: signsZ}, RoundId: round})
-	// zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
+	zap.L().Sugar().Debugf("updateConsuls: data => %v", bytes.NewBuffer(data))
 	req, err = http.NewRequest("POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(req, tx)
 	if err != nil {
 		return "", err
 	}
+	if !tx.Success {
+		return "", err
+	}
 
 	return tx.TxId, nil
 }
 func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
-	var msg []byte
+	//var msg []byte
 	DefaultConsulByte, _ := hex.DecodeString(DefaultConsul)
-	if consulsAddresses[1] == nil {
-		for i := 0; i < 3; i++ {
-			msg = append(msg, consulsAddresses[0].ToBytes(account.Ergo)...)
-		}
-		for i := 0; i < 2; i++ {
-			msg = append(msg, DefaultConsulByte...)
-		}
-	} else {
-		// in real this must be exist
-		for _, v := range consulsAddresses {
-			if v == nil {
+
+	var msg = make([]byte, 0, len(consulsAddresses))
+	// just in debug mode and if one consuls existed
+	firstConsul := consulsAddresses[0].ToBytes(account.Ergo)
+	for i := 0; i < len(consulsAddresses); i++ {
+		if consulsAddresses[i] == nil{
+			if i == 1{
+				msg = append(msg, firstConsul...)
+				msg = append(msg, firstConsul...)
+			}else if i == 2 && consulsAddresses[i-1] != nil{
+				msg = append(msg, consulsAddresses[i-1].ToBytes(account.Ergo)...)
+			}else if i > 2{
 				msg = append(msg, DefaultConsulByte...)
-				continue
 			}
-			msg = append(msg, v.ToBytes(account.Ergo)...)
+		}else{
+			msg = append(msg, consulsAddresses[i].ToBytes(account.Ergo)...)
 		}
 	}
+
+
+	//if consulsAddresses[1] == nil {
+	//	for i := 0; i < 3; i++ {
+	//		msg = append(msg, consulsAddresses[0].ToBytes(account.Ergo)...)
+	//	}
+	//	for i := 0; i < 2; i++ {
+	//		msg = append(msg, DefaultConsulByte...)
+	//	}
+	//} else {
+	//	// in real this must be exist
+	//	for _, v := range consulsAddresses {
+	//		if v == nil {
+	//			msg = append(msg, DefaultConsulByte...)
+	//			continue
+	//		}
+	//		msg = append(msg, v.ToBytes(account.Ergo)...)
+	//	}
+	//}
 
 	//for _, v := range consulsAddresses {
 	//	if v == nil {
