@@ -97,7 +97,7 @@ func GetDataType(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	url, err := JoinUrl(client.Options.BaseUrl, "adpator/getDataType")
+	url, err := JoinUrl(client.Options.BaseUrl, "adaptor/getDataType")
 	if err != nil {
 		return 0, err
 	}

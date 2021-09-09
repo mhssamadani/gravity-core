@@ -1,7 +1,6 @@
 package account
 
 import (
-	"encoding/hex"
 	"github.com/btcsuite/btcutil/base58"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/wavesplatform/gowaves/pkg/crypto"
@@ -35,12 +34,16 @@ func StringToNebulaId(address string, chainType ChainType) (NebulaId, error) {
 		nebula = BytesToNebulaId(nebulaBytes)
 		zap.L().Sugar().Debug("NebulaId: ", nebula)
 	case Ergo, Sigma:
-		nebulaBytes, err := hex.DecodeString(address)
-		if err != nil {
-			return NebulaId{}, err
-		}
+		nebulaBytes := base58.Decode(address)
 		nebula = BytesToNebulaId(nebulaBytes)
+		//nebulaBytes, err := hex.DecodeString(address)
+		//if err != nil {
+		//	return NebulaId{}, err
+		//}
+		//nebula = BytesToNebulaId(nebulaBytes)
 		zap.L().Sugar().Debug("NebulaId: ", nebula)
+		zap.L().Sugar().Debug("nebulaBytes: ", nebulaBytes)
+		zap.L().Sugar().Debug("Nebula: ", address)
 	}
 
 	return nebula, nil
@@ -67,7 +70,8 @@ func (id NebulaId) ToString(chainType ChainType) string {
 	case Solana:
 		return base58.Encode(nebula[:])
 	case Ergo, Sigma:
-		return hex.EncodeToString(nebula[:])
+		return base58.Encode(nebula[:])
+		//return hex.EncodeToString(nebula[:])
 	}
 
 	return ""

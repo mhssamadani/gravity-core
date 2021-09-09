@@ -483,7 +483,6 @@ func (scheduler *Scheduler) sendOraclesToNebula(nebulaId account.NebulaId, chain
 
 		fmt.Printf("Tx nebula (%s) oracles update: %s \n", nebulaId.ToString(chainType), tx)
 	}
-
 	return nil
 }
 
