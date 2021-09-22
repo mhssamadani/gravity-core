@@ -157,13 +157,6 @@ func doHttp(options ErgOptions, req *http.Request, v interface{}) (*Response, er
 		}
 	}
 
-	//select {
-	//case <-ctx.Done():
-	//	zap.L().Sugar().Debugf("ctx ended")
-	//	return response, ctx.Err()
-	//default:
-	//}
-
 	if v != nil {
 		if err = json.Unmarshal(body, v); err != nil {
 			zap.L().Sugar().Debugf("json parse error")

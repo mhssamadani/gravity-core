@@ -190,8 +190,9 @@ func (adaptor *SigmaAdaptor) GetHeight(ctx context.Context) (uint64, error) {
 	return response.Height, nil
 }
 func (adaptor *SigmaAdaptor) Sign(msg []byte) ([]byte, error) {
-	// zap.L().Sugar().Debugf("Sign: msgHex sigma => %v", hex.EncodeToString(msg))
-	// zap.L().Sugar().Debugf("Sign: msgByte sigma => %v", msg)
+	zap.L().Sugar().Debugf("Sign: msgHex => %v", hex.EncodeToString(msg))
+	zap.L().Sugar().Debugf("Sign: msgByte => %v", msg)
+	zap.L().Sugar().Debugf("Sign: msg => %v", string(msg))
 
 	type Sign struct {
 		A string `json:"a"`
@@ -271,18 +272,15 @@ func (adaptor *SigmaAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Co
 }
 
 func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
-	type Oracle struct {
-		State   bool     `json:"state"`
+	type AddPulseInfo struct {
+		Success  bool   `json:"success"`
 		Oracles []string `json:"oracles"`
 		Bft     int      `json:"bft"`
 	}
-	type Result struct {
-		Success  bool   `json:"success"`
-		Response Oracle `json:"response"`
-	}
+
 	type Sign struct {
-		a []string
-		z []string
+		A []string `json:"a"`
+		Z []string `json:"z"`
 	}
 	type Data struct {
 		Signs Sign   `json:"signs"`
@@ -306,32 +304,36 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 	if err != nil {
 		return "", err
 	}
-	result := new(Result)
+	result := new(AddPulseInfo)
 	_, err = adaptor.sigmaClient.Do(req, result)
 	if err != nil {
 		return "", err
 	}
 	if !result.Success {
 		return "", errors.New("can't get oracles")
-	} else if result.Success && !result.Response.State {
-		return "", errors.New("wrong pulseID")
-	} else {
-		oracles = result.Response.Oracles
+	} else if result.Success {
+		oracles = result.Oracles
 	}
 
 	// Iterate over oracles and get signs
-	for _, oracle := range oracles {
-		pubKey, err := account.StringToOraclePubKey(oracle, account.Sigma)
+	for i, oracle := range oracles {
+		tmpOracle := oracle
+		if oracles[i] == hex.EncodeToString(defaultPK) {
+			if i == 1 || i == 2{
+				tmpOracle = oracles[1]
+			}
+		}
+		pubKey, err := account.StringToOraclePubKey(tmpOracle, account.Sigma)
 		if err != nil {
-			signsA = append(signsA, "")
-			signsZ = append(signsZ, "")
+			signsA = append(signsA, strings.Repeat("0", 66))
+			signsZ = append(signsZ, "00")
 			continue
 		}
 		sign, err := adaptor.ghClient.Result(account.Sigma, nebulaId, int64(pulseId), pubKey)
 
 		if err != nil {
-			signsA = append(signsA, "")
-			signsZ = append(signsZ, "")
+			signsA = append(signsA, strings.Repeat("0", 66))
+			signsZ = append(signsZ, "00")
 			continue
 		}
 		signsA = append(signsA, string(sign[:66]))
@@ -340,15 +342,13 @@ func (adaptor *SigmaAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64,
 	}
 
 	// Check realSignCount with bftValue before sending data
-	if realSignCount == 0 {
-		return "", nil
-	}
-	if realSignCount < result.Response.Bft {
+	if realSignCount < result.Bft{
 		return "", nil
 	}
 
 	// Send oracleSigns to be verified by contract in proxy side and get txId
-	data, err := json.Marshal(Data{Signs: Sign{a: signsA, z: signsZ}, Hash: hex.EncodeToString(hash)})
+	data, err := json.Marshal(Data{Signs: Sign{A: signsA, Z: signsZ}, Hash: hex.EncodeToString(hash)})
+	zap.L().Sugar().Debugf("addPulse Data: %v",  bytes.NewBuffer(data))
 	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/addPulse")
 	if err != nil {
 		return "", err
@@ -401,6 +401,7 @@ func (adaptor *SigmaAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId 
 	if err != nil {
 		return err
 	}
+	zap.L().Sugar().Debugf("sendValueToSubs Data: %v", bytes.NewBuffer(jsonData))
 	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
@@ -492,17 +493,21 @@ func (adaptor *SigmaAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracl
 
 	var newOracles = make([]string, len(oracles), len(oracles))
 
-	for i := 0; i < len(oracles); i++ {
-		if oracles[i] == nil {
-			if i == 0 {
-				newOracles[i] = DefaultOracle
-			} else {
-				newOracles[i] = newOracles[i-1]
+	for i, v := range oracles {
+		if v == nil {
+			if i == 1 {
+				newOracles[i] = hex.EncodeToString(oracles[i-1].ToBytes(account.Sigma))
+				newOracles[i+1] = hex.EncodeToString(oracles[i-1].ToBytes(account.Sigma))
+			} else if i == 2 && oracles[i-1] != nil {
+				newOracles[i] = hex.EncodeToString(oracles[i-1].ToBytes(account.Sigma))
+			} else if i > 2 {
+				newOracles[i] = hex.EncodeToString(defaultPK)
 			}
-		} else {
-			newOracles[i] = hex.EncodeToString(oracles[i].ToBytes(account.Ergo))
+			continue
 		}
+		newOracles[i] = hex.EncodeToString(oracles[i].ToBytes(account.Sigma))
 	}
+
 
 	url, err = helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/updateOracles")
 	if err != nil {
@@ -690,46 +695,22 @@ func (adaptor *SigmaAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubK
 }
 func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
 	var msg []byte
-	//DefaultOracleByte, _ := hex.DecodeString(DefaultOracle)
-	//zeroByte, _ := hex.DecodeString(strings.Repeat("0", 66))
-	//if oracles[1] == nil {
-	//	if oracles[0] == nil {
-	//		for i := 0; i < 3; i++ {
-	//			msg = append(msg, zeroByte...)
-	//		}
-	//	} else {
-	//		for i := 0; i < 3; i++ {
-	//			msg = append(msg, oracles[0].ToBytes(account.Ergo)...)
-	//		}
-	//	}
-	//	for i := 0; i < 2; i++ {
-	//		msg = append(msg, DefaultOracleByte...)
-	//	}
-	//} else {
-	//	// in real this must be exist
-	//	for _, v := range oracles {
-	//		if v == nil {
-	//			msg = append(msg, DefaultOracleByte...)
-	//			continue
-	//		}
-	//		msg = append(msg, v.ToBytes(account.Ergo)...)
-	//	}
-	//}
 
-	for _, v := range oracles {
+
+	for i, v := range oracles {
 		if v == nil {
-			msg = append(msg, defaultPK...)
+			if i == 1 {
+				msg = append(msg, oracles[i-1].ToBytes(account.Sigma)...)
+				msg = append(msg, oracles[i-1].ToBytes(account.Sigma)...)
+			} else if i == 2 && oracles[i-1] != nil {
+				msg = append(msg, oracles[i-1].ToBytes(account.Sigma)...)
+			} else if i > 2 {
+				msg = append(msg, defaultPK...)
+			}
 			continue
 		}
-		msg = append(msg, v.ToBytes(account.Ergo)...)
+		msg = append(msg, v.ToBytes(account.Sigma)...)
 	}
-	//for _, v := range oracles {
-	//	if v == nil {
-	//		stringOracles = append(stringOracles, strings.Repeat("0", 66))
-	//		continue
-	//	}
-	//	stringOracles = append(stringOracles, hex.EncodeToString(v.ToBytes(account.Ergo)))
-	//}
 
 	sign, err := adaptor.Sign(msg)
 	if err != nil {
