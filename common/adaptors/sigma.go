@@ -723,7 +723,7 @@ func (adaptor *SigmaAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*a
 func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.Context) (uint64, error) {
 	type Result struct {
 		Success bool   `json:"success"`
-		PulseId string `json:"pulse_id"`
+		PulseId int64 `json:"lastPulseId"`
 	}
 	url, err := helpers.JoinUrl(adaptor.sigmaClient.Options.BaseUrl, "adaptor/getLastPulseId")
 	if err != nil {
@@ -741,8 +741,7 @@ func (adaptor *SigmaAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.
 	if !result.Success {
 		return 0, errors.New("can't get lastPulseId")
 	}
-	pulseId, _ := strconv.ParseUint(result.PulseId, 10, 64)
-	return pulseId, nil
+	return uint64(result.PulseId), nil
 }
 func (adaptor *SigmaAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {

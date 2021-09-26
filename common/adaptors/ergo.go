@@ -781,7 +781,7 @@ func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.Context) (uint64, error) {
 	type Result struct {
 		Success bool   `json:"success"`
-		PulseId string `json:"pulse_id"`
+		PulseId int64 `json:"lastPulseId"`
 	}
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/getLastPulseId")
 	if err != nil {
@@ -799,8 +799,7 @@ func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 	if !result.Success {
 		return 0, errors.New("can't get lastPulseId")
 	}
-	pulseId, _ := strconv.ParseUint(result.PulseId, 10, 64)
-	return pulseId, nil
+	return uint64(result.PulseId), nil
 }
 func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
