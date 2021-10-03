@@ -127,6 +127,7 @@ func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 			account.Fantom.String():   *ethPrivKeys,
 			account.Ergo.String():     *ergoPrivKeys,
 			account.Sigma.String():    *ergoPrivKeys,
+			account.XDai.String():     *ethPrivKeys,
 		},
 	}, nil
 }

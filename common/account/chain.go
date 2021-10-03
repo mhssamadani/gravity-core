@@ -18,6 +18,7 @@ const (
 	Polygon
 	Ergo
 	Sigma
+	XDai
 )
 
 var (
@@ -47,6 +48,8 @@ func ParseChainType(chainType string) (ChainType, error) {
 		return Ergo, nil
 	case "sigma":
 		return Sigma, nil
+	case "xdai":
+		return XDai, nil
 	default:
 		return 0, ErrParseChainType
 	}
@@ -73,6 +76,8 @@ func (ch ChainType) String() string {
 		return "erg"
 	case Sigma:
 		return "sigma"
+	case XDai:
+		return "xdai"
 	default:
 		return "ethereum"
 	}
