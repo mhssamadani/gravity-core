@@ -2,15 +2,12 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Gravity-Tech/gravity-core/common/account"
 	"io/ioutil"
 	"net/http"
-	"time"
-
-	"github.com/Gravity-Tech/gravity-core/common/account"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 
@@ -64,8 +61,6 @@ func generateErgoPrivKeys() (*Key, error) {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
 	seed := make([]byte, 32)
 	_, err := cryptorand.Read(seed)
@@ -75,15 +70,16 @@ func generateErgoPrivKeys() (*Key, error) {
 	secret := ergCrypto.NewKeyFromSeed(seed)
 
 	client, _ := ergClient.NewClient()
+
 	values := map[string]string{"sk": hex.EncodeToString(secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := ergClient.JoinUrl(client.Options.BaseUrl, "getAddressDetail")
-	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequest("POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
 	res := new(Response)
-	_, err = client.Do(ctx, req, res)
+	_, err = client.Do(req, res)
 	if err != nil {
 		panic(err)
 	}
@@ -102,7 +98,6 @@ func generateErgoPrivKeys() (*Key, error) {
 
 func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 	validatorPrivKey := ed25519.GenPrivKey()
-
 
 	ethPrivKeys, err := generateEthereumBasedPrivKeys()
 	if err != nil {
@@ -125,15 +120,17 @@ func GeneratePrivKeys(wavesChainID byte) (*Keys, error) {
 		},
 		TargetChains: map[string]Key{
 			account.Ethereum.String(): *ethPrivKeys,
-			account.Binance.String(): *ethPrivKeys,
-			account.Waves.String(): *wavesPrivKeys,
-			account.Avax.String(): *ethPrivKeys,
-			account.Heco.String(): *ethPrivKeys,
-			account.Fantom.String(): *ethPrivKeys,
-			account.Ergo.String(): *ergoPrivKeys,
+			account.Binance.String():  *ethPrivKeys,
+			account.Waves.String():    *wavesPrivKeys,
+			account.Avax.String():     *ethPrivKeys,
+			account.Heco.String():     *ethPrivKeys,
+			account.Fantom.String():   *ethPrivKeys,
+			account.Ergo.String():     *ergoPrivKeys,
+			account.XDai.String():     *ethPrivKeys,
 		},
 	}, nil
 }
+
 func ParseConfig(filename string, config interface{}) error {
 	file, err := ioutil.ReadFile(filename)
 	if err != nil {

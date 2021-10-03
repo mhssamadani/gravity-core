@@ -90,7 +90,7 @@ var (
 			account.Ergo.String(): {
 				NodeUrl: "http://176.9.65.58:9016/",
 				ChainType: account.Ergo.String(),
-				GravityContractAddress: "",
+				GravityContractAddress: "", // Handled in the proxy side of Ergo
 			},
 			account.Heco.String(): {
 				NodeUrl:                "https://http-mainnet.hecochain.com",
@@ -550,6 +550,12 @@ func createApp(db *badger.DB, ledgerValidator *account.LedgerValidator, privKeys
 				zap.L().Error(err.Error())
 				return nil, err
 			}
+		case account.XDai:
+			adaptor, err = adaptors.NewXDaiAdaptor(privKey, v.NodeUrl, ctx, adaptors.WithXDaiGravityContract(v.GravityContractAddress))
+			if err != nil {
+				zap.L().Error(err.Error())
+				return nil, err
+			}
 		case account.Ethereum:
 			adaptor, err = adaptors.NewEthereumAdaptor(privKey, v.NodeUrl, ctx, adaptors.WithEthereumGravityContract(v.GravityContractAddress))
 			if err != nil {
@@ -574,7 +580,6 @@ func createApp(db *badger.DB, ledgerValidator *account.LedgerValidator, privKeys
 				zap.L().Error(err.Error())
 				return nil, err
 			}
-
 		}
 
 		bAdaptors[chainType] = adaptor

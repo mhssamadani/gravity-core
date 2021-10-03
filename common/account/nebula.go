@@ -12,7 +12,6 @@ const (
 	EthereumAddressLength = 20
 	BSCAddressLength      = 20
 	WavesAddressLength    = 26
-	ErgoAddressLength     = 20
 )
 
 type NebulaId [NebulaIdLength]byte
@@ -21,7 +20,8 @@ func StringToNebulaId(address string, chainType ChainType) (NebulaId, error) {
 	var nebula NebulaId
 
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon:
+
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, XDai:
 		nebulaBytes, err := hexutil.Decode(address)
 		if err != nil {
 			return NebulaId{}, err
@@ -30,10 +30,16 @@ func StringToNebulaId(address string, chainType ChainType) (NebulaId, error) {
 	case Waves:
 		nebulaBytes := crypto.MustBytesFromBase58(address)
 		nebula = BytesToNebulaId(nebulaBytes)
-	case Solana, Ergo:
+	case Solana:
 		nebulaBytes := base58.Decode(address)
 		nebula = BytesToNebulaId(nebulaBytes)
 		zap.L().Sugar().Debug("NebulaId: ", nebula)
+	case Ergo:
+		nebulaBytes := base58.Decode(address)
+		nebula = BytesToNebulaId(nebulaBytes)
+		zap.L().Sugar().Debug("NebulaId: ", nebula)
+		zap.L().Sugar().Debug("nebulaBytes: ", nebulaBytes)
+		zap.L().Sugar().Debug("Nebula: ", address)
 	}
 
 	return nebula, nil
@@ -53,11 +59,13 @@ func BytesToNebulaId(value []byte) NebulaId {
 func (id NebulaId) ToString(chainType ChainType) string {
 	nebula := id.ToBytes(chainType)
 	switch chainType {
-	case Ethereum, Binance, Heco, Fantom, Avax, Polygon:
+	case Ethereum, Binance, Heco, Fantom, Avax, Polygon, XDai:
 		return hexutil.Encode(nebula[:])
-	case Waves, Ergo:
+	case Waves:
 		return base58.Encode(nebula[:])
 	case Solana:
+		return base58.Encode(nebula[:])
+	case Ergo:
 		return base58.Encode(nebula[:])
 	}
 
@@ -65,7 +73,7 @@ func (id NebulaId) ToString(chainType ChainType) string {
 }
 func (id NebulaId) ToBytes(chainType ChainType) []byte {
 	switch chainType {
-	case Binance, Heco, Fantom, Avax, Polygon:
+	case Binance, Heco, Fantom, Avax, Polygon, XDai:
 		return id[NebulaIdLength-BSCAddressLength:]
 	case Ethereum:
 		return id[NebulaIdLength-EthereumAddressLength:]
@@ -74,7 +82,7 @@ func (id NebulaId) ToBytes(chainType ChainType) []byte {
 	case Solana:
 		return id[:]
 	case Ergo:
-		return id[NebulaIdLength-ErgoAddressLength:]
+		return id[:]
 	}
 
 	return nil

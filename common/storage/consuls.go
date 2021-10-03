@@ -35,6 +35,8 @@ func formSignConsulsByConsulKey(pubKey account.ConsulPubKey, chainType account.C
 		prefix = "polygon"
 	case account.Ergo:
 		prefix = "erg"
+	case account.XDai:
+		prefix = "xdai"
 	}
 	return formKey(string(SignConsulsResultByConsulKey), hexutil.Encode(pubKey[:]), prefix, fmt.Sprintf("%d", roundId))
 }

@@ -2,6 +2,7 @@ package query
 
 import (
 	"encoding/json"
+	"go.uber.org/zap"
 
 	"github.com/Gravity-Tech/gravity-core/common/account"
 	"github.com/Gravity-Tech/gravity-core/common/storage"
@@ -73,6 +74,7 @@ func signNewOraclesByConsul(store *storage.Storage, value []byte) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
+	zap.L().Sugar().Debugf("signNewOraclesByConsul: rq => %v", rq)
 
 	return v, nil
 }

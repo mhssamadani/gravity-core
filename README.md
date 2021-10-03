@@ -37,6 +37,12 @@ The structure of the configuration file is partly described [here](https://docs.
     }
 
 config.json - configuration of the ledger node
+config.json: This file should be exactly the same in all nodes.
+p2p-PersistentPeers part should be like this:
+```
+"PersistentPeers": "[NODE-1 Id]@[NODE-1 IP]:26656,[Node-2 Id]@[NODE-2 IP]:26656,[Node-3 Id]@[NODE-3 IP]:26656"
+```
+you can get nodeId by calling `"[NODE-1 IP]:26656/status"`.
 
 The structure of the configuration file is partly described [here](https://docs.tendermint.com/master/tendermint-core/configuration.html), but there are a couple of custom sections:
     

@@ -24,6 +24,8 @@ type NebulaCustomParamsMap map[string]NebulaCustomParams
 type NebulaCustomParams map[string]interface{}
 
 func parseNebulaInfoKey(value []byte) (account.NebulaId, error) {
+	zap.L().Sugar().Debugf("parseNebulaInfoKey value => %v", value)
+
 	hex := []byte(strings.Split(string(value), Separator)[2])
 	key, err := hexutil.Decode(string(hex))
 	if err != nil {
@@ -31,9 +33,13 @@ func parseNebulaInfoKey(value []byte) (account.NebulaId, error) {
 	}
 	var pubKey account.NebulaId
 	copy(pubKey[:], key[:])
+	zap.L().Sugar().Debugf("parseNebulaInfoKey pubKey => %v", pubKey)
+
 	return pubKey, nil
 }
 func formNebulaInfoKey(nebulaId account.NebulaId) []byte {
+
+	zap.L().Sugar().Debugf("formNebulaInfoKey => %v", formKey(string(NebulaInfoKey), hexutil.Encode(nebulaId[:])))
 	return formKey(string(NebulaInfoKey), hexutil.Encode(nebulaId[:]))
 }
 
@@ -63,11 +69,14 @@ func (storage *Storage) Nebulae() (NebulaMap, error) {
 			return nil, err
 		}
 	}
+	zap.L().Sugar().Debugf("Nebulae NebulaInfo => %v", nebulaeInfo)
 
 	return nebulaeInfo, nil
 }
 func (storage *Storage) NebulaInfo(nebulaId account.NebulaId) (*NebulaInfo, error) {
 	b, err := storage.getValue(formNebulaInfoKey(nebulaId))
+	zap.L().Sugar().Debugf("NebulaInfo b => %v", b)
+
 	if err != nil {
 		return nil, err
 	}

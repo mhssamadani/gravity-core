@@ -5,14 +5,20 @@ import (
 
 	"github.com/Gravity-Tech/gravity-core/common/account"
 	"github.com/ethereum/go-ethereum/crypto"
+	"golang.org/x/crypto/blake2b"
 )
 
-
 func WrappedKeccak256(input []byte, chain account.ChainType) []byte {
-	if chain != account.Solana {
-		return crypto.Keccak256(input[:])
+	var hash []byte
+	switch chain {
+	case account.Solana:
+		digest := sha256.Sum256(input[:])
+		hash = digest[:]
+	case account.Ergo:
+		digest := blake2b.Sum256(input[:])
+		hash = digest[:]
+	default:
+		hash = crypto.Keccak256(input[:])
 	}
-	
-	digest := sha256.Sum256(input[:])
-	return digest[:]
+	return hash
 }

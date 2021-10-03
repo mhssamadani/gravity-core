@@ -67,10 +67,11 @@ type SolanaAdapter struct {
 	Bft               uint8
 	oracleInterval    uint64
 
-	ibportProgramAccount solana_common.PublicKey
-	ibportDataAccount    solana_common.PublicKey
-	tokenProgramAddress  solana_common.PublicKey
-	ibPortPDA            solana_common.PublicKey
+	ibportProgramAccount  solana_common.PublicKey
+	ibportDataAccount     solana_common.PublicKey
+	tokenProgramAddress   solana_common.PublicKey
+	ibPortPDA             solana_common.PublicKey
+	IBPortPDAtokenAccount solana_common.PublicKey
 }
 type SolanaAdapterOption func(*SolanaAdapter) error
 
@@ -119,6 +120,10 @@ func SolanaAdapterWithCustom(custom map[string]interface{}) SolanaAdapterOption 
 		ibPortPDA, ok := custom["ib_port_pda"].(string)
 		if ok {
 			s.ibPortPDA = solana_common.PublicKeyFromString(ibPortPDA)
+		}
+		ibPortPDAtokenAccount, ok := custom["ib_port_pda_token_account"].(string)
+		if ok {
+			s.IBPortPDAtokenAccount = solana_common.PublicKeyFromString(ibPortPDAtokenAccount)
 		}
 
 		return nil
@@ -854,6 +859,14 @@ func (s *SolanaAdapter) createSendValueToSubsMessage(nebulaId account.NebulaId, 
 	}
 	nebulaDataAccount := solana_common.PublicKeyFromBytes(nebulaId[:])
 	recipient := solana_common.PublicKeyFromBytes(RecipientFromByteArray(value))
+
+	resp, err := s.client.GetAccountInfo(context.Background(), recipient.ToBase58(), solana.GetAccountInfoConfig{
+		Encoding: "base64",
+	})
+	if err != nil {
+		return types.Message{}, err
+	}
+	recipientOwner := solana_common.PublicKeyFromString(resp.Owner)
 	message := types.NewMessage(
 		s.account.PublicKey,
 		[]types.Instruction{
@@ -861,8 +874,8 @@ func (s *SolanaAdapter) createSendValueToSubsMessage(nebulaId account.NebulaId, 
 				s.account.PublicKey, s.nebulaProgram, s.nebulaProgram,
 				nebulaDataAccount, s.multisigAccount,
 				s.ibportProgramAccount, s.ibportDataAccount,
-				s.tokenProgramAddress, recipient, s.ibPortPDA,
-				DataType, value, pulseId, id,
+				s.tokenProgramAddress, recipient, s.ibPortPDA, recipientOwner,
+				s.IBPortPDAtokenAccount, DataType, value, pulseId, id,
 			),
 		},
 		recentBlockHash.Blockhash,
