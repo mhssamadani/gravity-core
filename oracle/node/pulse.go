@@ -8,15 +8,16 @@ import (
 	"github.com/Gravity-Tech/gravity-core/oracle/extractor"
 	"go.uber.org/zap"
 
+	"github.com/Gravity-Tech/gravity-core/common/hashing"
 	"github.com/Gravity-Tech/gravity-core/common/transactions"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func (node *Node) commit(data *extractor.Data, tcHeight uint64, pulseId uint64) ([]byte, error) {
+func (node *Node) invokeCommitTx(data *extractor.Data, tcHeight uint64, pulseId uint64) ([]byte, error) {
 	dataBytes := toBytes(data, node.extractor.ExtractorType)
 	zap.L().Sugar().Debugf("Extractor data type: %d", node.extractor.ExtractorType)
-	commit := crypto.Keccak256(dataBytes)
+
+	commit := hashing.WrappedKeccak256(dataBytes, node.chainType)
 	fmt.Printf("Commit: %s - %s \n", hexutil.Encode(dataBytes), hexutil.Encode(commit[:]))
 
 	tx, err := transactions.New(node.validator.pubKey, transactions.Commit, node.validator.privKey)
@@ -51,7 +52,8 @@ func (node *Node) commit(data *extractor.Data, tcHeight uint64, pulseId uint64) 
 
 	return commit, nil
 }
-func (node *Node) reveal(tcHeight uint64, pulseId uint64, reveal *extractor.Data, commit []byte) error {
+
+func (node *Node) invokeRevealTx(tcHeight uint64, pulseId uint64, reveal *extractor.Data, commit []byte) error {
 	dataBytes := toBytes(reveal, node.extractor.ExtractorType)
 	fmt.Printf("Reveal: %s  - %s \n", hexutil.Encode(dataBytes), hexutil.Encode(commit))
 	println(base64.StdEncoding.EncodeToString(dataBytes))
@@ -78,6 +80,9 @@ func (node *Node) reveal(tcHeight uint64, pulseId uint64, reveal *extractor.Data
 		transactions.BytesValue{
 			Value: node.oraclePubKey[:],
 		},
+		transactions.IntValue{
+			Value: int64(node.chainType),
+		},
 	})
 
 	err = node.gravityClient.SendTx(tx)
@@ -88,7 +93,8 @@ func (node *Node) reveal(tcHeight uint64, pulseId uint64, reveal *extractor.Data
 
 	return nil
 }
-func (node *Node) signResult(intervalId uint64, pulseId uint64, ctx context.Context) (*extractor.Data, []byte, error) {
+
+func (node *Node) signRoundResult(intervalId uint64, pulseId uint64, ctx context.Context) (*extractor.Data, []byte, error) {
 	zap.L().Sugar().Debugf("signResults: interval: %d, pulseId: %d", intervalId, pulseId)
 	var values []extractor.Data
 	zap.L().Sugar().Debugf("gravity Reveals: chaintype: %d, pulseId: %d NebulaId: %s", node.chainType, pulseId, node.nebulaId.ToString(node.chainType))
@@ -116,7 +122,8 @@ func (node *Node) signResult(intervalId uint64, pulseId uint64, ctx context.Cont
 		return nil, nil, err
 	}
 
-	hash := crypto.Keccak256(toBytes(result, node.extractor.ExtractorType))
+	hash := hashing.WrappedKeccak256(toBytes(result, node.extractor.ExtractorType), node.chainType)
+
 	sign, err := node.adaptor.SignHash(node.nebulaId, intervalId, pulseId, hash)
 	if err != nil {
 		zap.L().Error(err.Error())
@@ -143,6 +150,9 @@ func (node *Node) signResult(intervalId uint64, pulseId uint64, ctx context.Cont
 		},
 		transactions.BytesValue{
 			Value: node.oraclePubKey[:],
+		},
+		transactions.IntValue{
+			Value: int64(node.chainType),
 		},
 	})
 

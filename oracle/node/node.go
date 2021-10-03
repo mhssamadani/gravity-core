@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Gravity-Tech/gravity-core/abi"
+	"github.com/mr-tron/base58"
 	"go.uber.org/zap"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -39,6 +40,18 @@ var (
 type Validator struct {
 	privKey tendermintCrypto.PrivKeyEd25519
 	pubKey  account.ConsulPubKey
+}
+
+// IntPow calculates n to the mth power. Since the result is an int, it is assumed that m is a positive power
+func IntPow(n, m int) int {
+	if m == 0 {
+		return 1
+	}
+	result := n
+	for i := 2; i <= m; i++ {
+		result *= n
+	}
+	return result
 }
 
 func NewValidator(privKey []byte) *Validator {
@@ -186,7 +199,7 @@ func (node *Node) Init() error {
 	if err != nil {
 		return err
 	}
-
+	zap.L().Sugar().Debug("OraclesByNebula ", oraclesByNebulaKey)
 	_, ok = oraclesByNebulaKey[node.oraclePubKey.ToString(node.chainType)]
 	if !ok {
 		tx, err := transactions.New(node.validator.pubKey, transactions.AddOracleInNebula, node.validator.privKey)
@@ -228,7 +241,7 @@ func (node *Node) Start(ctx context.Context) {
 	var lastTcHeight uint64
 	var pulseCountInBlock uint64
 	var lastPulseId uint64
-
+	firstCommitIteration := true
 	node.gravityClient.HttpClient.WSEvents.Start()
 	defer node.gravityClient.HttpClient.WSEvents.Stop()
 	ch, err := node.gravityClient.HttpClient.WSEvents.Subscribe(ctx, "gravity-oracle", "tm.event='NewBlock'", 999)
@@ -247,6 +260,7 @@ func (node *Node) Start(ctx context.Context) {
 	// }
 
 	roundState := new(RoundState)
+	attempts := 1
 	for {
 		//time.Sleep(time.Duration(TimeoutMs) * time.Millisecond)
 		<-ch
@@ -257,12 +271,23 @@ func (node *Node) Start(ctx context.Context) {
 		newLastPulseId, err := node.adaptor.LastPulseId(node.nebulaId, ctx)
 		if err != nil {
 			zap.L().Error(err.Error())
+			time.Sleep(time.Millisecond * time.Duration(IntPow(2, attempts)) * 20)
+			attempts = attempts + 1
 			continue
 		}
+		attempts = 1
 
 		if lastPulseId != newLastPulseId {
 			lastPulseId = newLastPulseId
-			roundState = new(RoundState)
+			roundState = &RoundState{
+				data:        nil,
+				commitHash:  []byte{},
+				resultValue: nil,
+				resultHash:  []byte{},
+				isSent:      false,
+				commitSent:  false,
+				RevealExist: false,
+			}
 		}
 		zap.L().Sugar().Debugf("Round Loop Pulse new: %d last:%d", newLastPulseId, lastPulseId)
 		tcHeight, err := node.adaptor.GetHeight(ctx)
@@ -274,13 +299,25 @@ func (node *Node) Start(ctx context.Context) {
 			if tcHeight != lastTcHeight {
 				zap.L().Sugar().Infof("Tc Height: %d\n", tcHeight)
 				lastTcHeight = tcHeight
-				if tcHeight%node.blocksInterval == 0 {
+				if firstCommitIteration {
 					pulseCountInBlock = 0
-					roundState = new(RoundState)
+					roundState = &RoundState{
+						data:        nil,
+						commitHash:  []byte{},
+						resultValue: nil,
+						resultHash:  []byte{},
+						isSent:      false,
+						commitSent:  false,
+						RevealExist: false,
+					}
+					firstCommitIteration = false
 				}
 			}
+		} else {
+			firstCommitIteration = true
 		}
 
+		zap.L().Sugar().Debugf("getting oracles for nebula [%s] chain type [%s]", base58.Encode(node.nebulaId[:]), node.chainType)
 		oraclesMap, err := node.gravityClient.BftOraclesByNebula(node.chainType, node.nebulaId)
 		if err != nil {
 			zap.L().Error(err.Error())
@@ -320,153 +357,17 @@ func (node *Node) Start(ctx context.Context) {
 }
 
 func (node *Node) execute(pulseId uint64, round state.SubRound, tcHeight uint64, intervalId uint64, roundState *RoundState, ctx context.Context) error {
-	switch round {
-	case state.CommitSubRound:
-		zap.L().Sugar().Debugf("Commit subround pulseId: %d", pulseId)
-		if roundState.commitHash != nil {
-			return nil
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("execute round", r)
 		}
-		_, err := node.gravityClient.CommitHash(node.chainType, node.nebulaId, int64(intervalId), int64(pulseId), node.oraclePubKey)
-		if err != nil && err != gravity.ErrValueNotFound {
-			zap.L().Error(err.Error())
-			return err
-		} else if err == nil {
-			return nil
-		}
+	}()
 
-		data, err := node.extractor.Extract(ctx)
-		if err != nil && err != extractor.NotFoundErr {
-			zap.L().Error(err.Error())
-			return err
-		} else if err == extractor.NotFoundErr {
-			return nil
-		}
-
-		if data == nil {
-			zap.L().Debug("Commit subround Extractor Data is empty")
-			return nil
-		}
-		zap.L().Sugar().Debug("Extracted data ", data)
-
-		commit, err := node.commit(data, intervalId, pulseId)
-		if err != nil {
-			return err
-		}
-
-		roundState.commitHash = commit
-		roundState.data = data
-		zap.L().Sugar().Debug("Commit round end ", roundState)
-	case state.RevealSubRound:
-		zap.L().Debug("Reveal subround")
-		if roundState.commitHash == nil || roundState.RevealExist {
-			zap.L().Sugar().Debugf("CommitHash is nil: %t, RevealExist: %t", roundState.commitHash == nil, roundState.RevealExist)
-			return nil
-		}
-		_, err := node.gravityClient.Reveal(node.chainType, node.oraclePubKey, node.nebulaId, int64(intervalId), int64(pulseId), roundState.commitHash)
-		if err != nil && err != gravity.ErrValueNotFound {
-			zap.L().Error(err.Error())
-			return err
-		} else if err == nil {
-			return nil
-		}
-
-		err = node.reveal(intervalId, pulseId, roundState.data, roundState.commitHash)
-		if err != nil {
-			zap.L().Error(err.Error())
-			return err
-		}
-		roundState.RevealExist = true
-		zap.L().Sugar().Debug("Reveal round end ", roundState)
-	case state.ResultSubRound:
-		zap.L().Debug("Result subround")
-		if roundState.data == nil && !roundState.RevealExist {
-			return nil
-		}
-		if roundState.resultValue != nil {
-			zap.L().Debug("Round sign exists")
-			return nil
-		}
-		value, hash, err := node.signResult(intervalId, pulseId, ctx)
-		if err != nil {
-			zap.L().Error(err.Error())
-			return err
-		}
-		//TODO migrate to err
-		if value == nil {
-			zap.L().Sugar().Debugf("Value is nil: %t", value == nil)
-			return nil
-		}
-
-		roundState.resultValue = value
-		roundState.resultHash = hash
-	case state.SendToTargetChain:
-		zap.L().Debug("Send to target chain subround")
-		var oracles []account.OraclesPubKey
-		var myRound uint64
-
-		if roundState.isSent || roundState.resultValue == nil {
-			zap.L().Sugar().Debugf("roundState.isSent: %t, resultValue is nil: %t", roundState.isSent, roundState.resultValue == nil)
-			return nil
-		}
-
-		oraclesMap, err := node.gravityClient.BftOraclesByNebula(node.chainType, node.nebulaId)
-		if err != nil {
-			zap.L().Sugar().Debugf("BFT error: %s , \n %s", err, zap.Stack("trace").String)
-			return nil
-		}
-		if _, ok := oraclesMap[node.oraclePubKey.ToString(node.chainType)]; !ok {
-			zap.L().Debug("Oracle not found")
-			return nil
-		}
-
-		var count uint64
-		for k, v := range oraclesMap {
-			oracle, err := account.StringToOraclePubKey(k, v)
-			if err != nil {
-				return err
-			}
-			oracles = append(oracles, oracle)
-			if node.oraclePubKey == oracle {
-				myRound = count
-			}
-			count++
-		}
-
-		if len(oracles) == 0 {
-			zap.L().Debug("Oracles map is empty")
-			return nil
-		}
-		if intervalId%uint64(len(oracles)) != myRound {
-			zap.L().Debug("Len oracles != myRound")
-			return nil
-		}
-		zap.L().Debug("Adding pulse")
-		txId, err := node.adaptor.AddPulse(node.nebulaId, pulseId, oracles, roundState.resultHash, ctx)
-
-		if err != nil {
-			zap.L().Sugar().Debugf("Error: %s", err)
-			return err
-		}
-
-		if txId != "" {
-			err = node.adaptor.WaitTx(txId, ctx)
-			if err != nil {
-				zap.L().Sugar().Debugf("Error: %s", err)
-				return err
-			}
-
-			zap.L().Sugar().Infof("Result tx id: %s", txId)
-
-			roundState.isSent = true
-			zap.L().Debug("Sending Value to subs")
-			err = node.adaptor.SendValueToSubs(node.nebulaId, pulseId, roundState.resultValue, ctx)
-			if err != nil {
-				zap.L().Sugar().Debugf("Error: %s", err)
-				return err
-			}
-		} else {
-			fmt.Printf("Info: Tx result not sent")
-		}
-	}
-	return nil
+	return oracleRoundExecutor.Execute(node, &roundExecuteProps{
+		PulseID:    pulseId,
+		Round:      round,
+		IntervalID: intervalId,
+		RoundState: roundState,
+		Ctx:        ctx,
+	})
 }
