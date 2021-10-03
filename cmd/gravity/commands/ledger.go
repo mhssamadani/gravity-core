@@ -62,6 +62,8 @@ const (
 	CustomId  ChainId = "gravity-custom"
 	MainnetId ChainId = "gravity-mainnet"
 
+	ergoProxyUrl = ""
+
 	DefaultPrivateRpcHost = "127.0.0.1:2500"
 
 	MainnetBootstrapHost   = "http://134.122.37.128:26657"
@@ -88,7 +90,7 @@ var (
 				GravityContractAddress: "3PLpMu2cAg618e7xXYHtckFJjFZksPFHoLm",
 			},
 			account.Ergo.String(): {
-				NodeUrl: "http://176.9.65.58:9016/",
+				NodeUrl: ergoProxyUrl,
 				ChainType: account.Ergo.String(),
 				GravityContractAddress: "", // Handled in the proxy side of Ergo
 			},

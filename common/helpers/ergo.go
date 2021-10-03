@@ -23,7 +23,7 @@ type ErgOptions struct {
 }
 
 var DefaultOptions = ErgOptions{
-	BaseUrl: "http://176.9.65.58:9016/",
+	BaseUrl: "",
 	Doer:    &http.Client{Timeout: 60 * time.Second},
 }
 
@@ -87,7 +87,7 @@ func NewClient(options ...ErgOptions) (*ErgClient, error) {
 	return c, nil
 }
 
-func GetDataType(ctx context.Context) (int, error) {
+func GetDataType(ctx context.Context, proxyUrl string) (int, error) {
 	type Result struct {
 		Success  bool `json:"success"`
 		DataType int  `json:"dataType"`
@@ -96,7 +96,7 @@ func GetDataType(ctx context.Context) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	url, err := JoinUrl(client.Options.BaseUrl, "adaptor/getDataType")
+	url, err := JoinUrl(proxyUrl, "adaptor/getDataType")
 	if err != nil {
 		return 0, err
 	}

@@ -64,7 +64,6 @@ func (adaptor *ErgoAdaptor) applyOpts(opts AdapterOptions) error {
 				adaptor.ergoClient = val.(*helpers.ErgClient)
 			case "gravityContract":
 				adaptor.gravityContract = val.(string)
-
 			}
 		}
 	}
@@ -302,7 +301,7 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 	return oraclePubKey
 }
 func (adaptor *ErgoAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Context) (abi.ExtractorType, error) {
-	dataType, err := helpers.GetDataType(ctx)
+	dataType, err := helpers.GetDataType(ctx, adaptor.ergoClient.Options.BaseUrl)
 	if err != nil {
 		return 0, err
 	}
@@ -408,7 +407,7 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 		TxId    string `json:"txId"`
 	}
 
-	dataType, err := helpers.GetDataType(ctx)
+	dataType, err := helpers.GetDataType(ctx, adaptor.ergoClient.Options.BaseUrl)
 	if err != nil {
 		return err
 	}

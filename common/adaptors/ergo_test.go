@@ -13,6 +13,8 @@ import (
 	"testing"
 )
 
+const proxyUrl = ""
+
 func TestErgoAdaptor_applyOpts(t *testing.T) {
 	f := NewFactory()
 	if f != nil {
@@ -92,7 +94,7 @@ func TestErgoAdaptor_GetHeight(t *testing.T) {
 	rand.Read(seed)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -121,7 +123,7 @@ func TestErgoAdaptor_Sign(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -160,7 +162,7 @@ func TestErgoAdaptor_WaitTx(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -190,7 +192,7 @@ func TestErgo_PubKey(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -224,7 +226,7 @@ func TestErgoAdaptor_LastPulseId(t *testing.T) {
 	rand.Read(seed)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,
@@ -260,7 +262,7 @@ func TestErgoAdaptor_LastRound(t *testing.T) {
 	rand.Read(seed)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: "http://176.9.65.58:9016/"})
+			client, _ := helpers.NewClient(helpers.ErgOptions{ApiKey: "", BaseUrl: proxyUrl})
 			secret := crypto.NewKeyFromSeed(seed)
 			er := &ErgoAdaptor{
 				ergoClient: client,

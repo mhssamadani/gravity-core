@@ -137,3 +137,8 @@ For a more custom setup, this file can be edited manually.
 ## Start oracle
     
     gravity oracle --home={home} start <nebula address>
+## extra note about ergo adaptor
+
+* This code developed base on two network base on ergo. There is no test with other coins.
+* please fill ergoProxyUrl in config/config.go. (It's not the final version, this problem will be fixed.)
+* please run the project in custom network.

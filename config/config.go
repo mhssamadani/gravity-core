@@ -16,6 +16,7 @@ import (
 	ergClient "github.com/Gravity-Tech/gravity-core/common/helpers"
 	ethCrypto "github.com/ethereum/go-ethereum/crypto"
 
+	"github.com/Gravity-Tech/gravity-core/common/helpers"
 	"github.com/tendermint/tendermint/crypto/ed25519"
 	wavesplatform "github.com/wavesplatform/go-lib-crypto"
 )
@@ -30,6 +31,9 @@ type Key struct {
 	PubKey  string
 	PrivKey string
 }
+
+const ergoProxyUrl = ""
+
 
 func generateEthereumBasedPrivKeys() (*Key, error) {
 	ethPrivKey, err := ethCrypto.GenerateKey()
@@ -69,7 +73,7 @@ func generateErgoPrivKeys() (*Key, error) {
 	}
 	secret := ergCrypto.NewKeyFromSeed(seed)
 
-	client, _ := ergClient.NewClient()
+	client, _ := ergClient.NewClient(helpers.ErgOptions{BaseUrl:ergoProxyUrl})
 
 	values := map[string]string{"sk": hex.EncodeToString(secret)}
 	jsonValue, _ := json.Marshal(values)
