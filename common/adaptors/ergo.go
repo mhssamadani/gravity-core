@@ -31,9 +31,9 @@ const (
 	ConsulsNumber  = 5
 	OraclessNumber = 5
 	DefaultConsul  = "038179cc7a2358f9489b629ede2304c4eebf71c9e42a246e87d31bee71a737fd8a"
-	//DefaultValidOracle = "02cd0b9784f67d4ad2def93d3b485790e8f2cebfd129606601b20f9f4f90e6d021"
-	DefaultOracle = "032ff0e8783d73c2d711158140be0a10123f8793ba7b42d59fd349793049e2103e"
+	DefaultOracle  = "032ff0e8783d73c2d711158140be0a10123f8793ba7b42d59fd349793049e2103e"
 )
+
 var defaultPK = make([]byte, 33)
 
 type ErgoAdaptor struct {
@@ -265,7 +265,7 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 
 	signString := responseObject.Signs.A + responseObject.Signs.Z
-	// zap.L().Sugar().Debugf("sign result => %v", signString)
+	zap.L().Sugar().Debugf("sign result => %v", signString)
 	signBytes := []byte(signString)
 	return signBytes, nil
 }
@@ -311,7 +311,7 @@ func (adaptor *ErgoAdaptor) ValueType(nebulaId account.NebulaId, ctx context.Con
 
 func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, validators []account.OraclesPubKey, hash []byte, ctx context.Context) (string, error) {
 	type AddPulseInfo struct {
-		Success  bool   `json:"success"`
+		Success bool     `json:"success"`
 		Oracles []string `json:"oracles"`
 		Bft     int      `json:"bft"`
 	}
@@ -357,7 +357,7 @@ func (adaptor *ErgoAdaptor) AddPulse(nebulaId account.NebulaId, pulseId uint64, 
 	for i, oracle := range oracles {
 		tmpOracle := oracle
 		if oracles[i] == hex.EncodeToString(defaultPK) {
-			if i == 1 || i == 2{
+			if i == 1 || i == 2 {
 				tmpOracle = oracles[1]
 			}
 		}
@@ -495,13 +495,12 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		consuls = result.Consuls
 	}
 
-	// zap.L().Sugar().Debugf("consuls => %v", consuls)
+	zap.L().Sugar().Debugf("consuls => %v", consuls)
 	var signsA = make([]string, len(consuls), len(consuls))
 	var signsZ = make([]string, len(consuls), len(consuls))
 
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		// zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 		index := -1
 		for i, v := range consuls {
 			if v == pubKey {
@@ -516,35 +515,25 @@ func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracle
 		signsZ[index] = string(sign[66:])
 	}
 
-	// just in debug mode and if one consuls existed
-	for i := 1; i < len(oracles); i++ {
-		if signsA[i] == "" {
-			if i <= 2 {
-				signsA[i] = signsA[i-1]
-				signsZ[i] = signsZ[i-1]
-			} else {
-				signsA[i] = strings.Repeat("0", 66)
-				signsZ[i] = "00"
-			}
+	for i, signA := range signsA {
+		if signA != "" {
+			continue
+
+		} else {
+			signsA[i] = strings.Repeat("0", 66)
+			signsZ[i] = "00"
 		}
 	}
 
-	var newOracles = make([]string, len(oracles), len(oracles))
+	var newOracles []string
 
 	zap.L().Sugar().Debugf("oracles: %v", oracles)
-	for i, v := range oracles {
-		if v == nil {
-			if i == 1 {
-				newOracles[i] = hex.EncodeToString(oracles[i-1].ToBytes(account.Ergo))
-				newOracles[i+1] = hex.EncodeToString(oracles[i-1].ToBytes(account.Ergo))
-			} else if i == 2 && oracles[i-1] != nil {
-				newOracles[i] = hex.EncodeToString(oracles[i-1].ToBytes(account.Ergo))
-			} else if i > 2 {
-				newOracles[i] = hex.EncodeToString(defaultPK)
-			}
+	for _, oracle := range oracles {
+		if oracle == nil {
+			newOracles = append(newOracles, hex.EncodeToString(defaultPK))
 			continue
 		}
-		newOracles[i] = hex.EncodeToString(oracles[i].ToBytes(account.Ergo))
+		newOracles = append(newOracles, hex.EncodeToString(oracle.ToBytes(account.Ergo)))
 	}
 
 	url, err = helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/updateOracles")
@@ -611,10 +600,8 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 
 	var signsA = make([]string, len(consuls), len(consuls))
 	var signsZ = make([]string, len(consuls), len(consuls))
-	// zap.L().Sugar().Debugf("Consuls => %v", consuls)
 	for k, sign := range signs {
 		pubKey := k.ToString(account.Ergo)
-		// zap.L().Sugar().Debugf("pk => %v\n sign => %v", pubKey, string(sign))
 
 		index := -1
 		for i, v := range consuls {
@@ -632,37 +619,20 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	}
 
 	// just in debug mode and if one consuls existed
-	for i := 1; i < len(consuls); i++ {
-		if signsA[i] == "" {
-			if i == 1 {
-				signsA[i] = signsA[i-1]
-				signsA[i+1] = signsA[i-1]
-				signsZ[i] = signsZ[i-1]
-				signsZ[i+1] = signsZ[i-1]
-			} else if i == 2 {
-				signsA[i] = signsA[i-1]
-				signsZ[i] = signsZ[i-1]
-			} else {
-				signsA[i] = strings.Repeat("0", 66)
-				signsZ[i] = "00"
-			}
+	for i, signA := range signsA {
+		if signA != "" {
+			continue
 		}
+		signsA[i] = strings.Repeat("0", 66)
+		signsZ[i] = "00"
 	}
 
-	var newConsulsString = make([]string, ConsulsNumber, ConsulsNumber)
-	// just in debug mode and if one consuls existed
-	for i := 0; i < len(newConsulsAddresses); i++ {
-		if newConsulsAddresses[i] == nil {
-			if i == 1 {
-				newConsulsString[i] = hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo))
-				newConsulsString[i+1] = hex.EncodeToString(newConsulsAddresses[0].ToBytes(account.Ergo))
-			} else if i == 2 && newConsulsAddresses[i-1] != nil {
-				newConsulsString[i] = newConsulsString[i-1]
-			} else if i > 2 {
-				newConsulsString[i] = DefaultConsul
-			}
+	var newConsulsString []string
+	for _, consulsAddress := range newConsulsAddresses {
+		if consulsAddress == nil {
+			newConsulsString = append(newConsulsString, DefaultConsul)
 		} else {
-			newConsulsString[i] = hex.EncodeToString(newConsulsAddresses[i].ToBytes(account.Ergo))
+			newConsulsString = append(newConsulsString, hex.EncodeToString(consulsAddress.ToBytes(account.Ergo)))
 		}
 	}
 
@@ -691,86 +661,41 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	return tx.TxId, nil
 }
 func (adaptor *ErgoAdaptor) SignConsuls(consulsAddresses []*account.OraclesPubKey, roundId int64, sender account.OraclesPubKey) ([]byte, error) {
-	//var msg []byte
 	DefaultConsulByte, _ := hex.DecodeString(DefaultConsul)
 
 	var msg = make([]byte, 0, len(consulsAddresses))
-	// just in debug mode and if one consuls existed
-	firstConsul := consulsAddresses[0].ToBytes(account.Ergo)
-	for i := 0; i < len(consulsAddresses); i++ {
-		if consulsAddresses[i] == nil {
-			if i == 1 {
-				msg = append(msg, firstConsul...)
-				msg = append(msg, firstConsul...)
-			} else if i == 2 && consulsAddresses[i-1] != nil {
-				msg = append(msg, consulsAddresses[i-1].ToBytes(account.Ergo)...)
-			} else if i > 2 {
-				msg = append(msg, DefaultConsulByte...)
-			}
-		} else {
-			msg = append(msg, consulsAddresses[i].ToBytes(account.Ergo)...)
-		}
-	}
 
-	//if consulsAddresses[1] == nil {
-	//	for i := 0; i < 3; i++ {
-	//		msg = append(msg, consulsAddresses[0].ToBytes(account.Ergo)...)
-	//	}
-	//	for i := 0; i < 2; i++ {
-	//		msg = append(msg, DefaultConsulByte...)
-	//	}
-	//} else {
-	//	// in real this must be exist
-	//	for _, v := range consulsAddresses {
-	//		if v == nil {
-	//			msg = append(msg, DefaultConsulByte...)
-	//			continue
-	//		}
-	//		msg = append(msg, v.ToBytes(account.Ergo)...)
-	//	}
-	//}
-
-	//for _, v := range consulsAddresses {
-	//	if v == nil {
-	//		msg = append(msg, strings.Repeat("0", 66))
-	//		continue
-	//	}
-	//	msg = append(msg, hex.EncodeToString(v.ToBytes(account.Ergo)))
-	//}
-
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(roundId))
-	msg = append(msg, b...)
-	//msg = append(msg, fmt.Sprintf("%d", myRound))
-
-	//msgHex, _ := hex.DecodeString(strings.Join(msg, ""))
-	sign, err := adaptor.Sign(msg)
-	if err != nil {
-		return nil, err
-	}
-	// zap.L().Sugar().Debugf("SignConsuls erg => %v", string(sign))
-
-	return sign, err
-}
-func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
-	var msg []byte
-
-	for i, v := range oracles {
+	for _, v := range consulsAddresses {
 		if v == nil {
-			if i == 1 {
-				msg = append(msg, oracles[i-1].ToBytes(account.Ergo)...)
-				msg = append(msg, oracles[i-1].ToBytes(account.Ergo)...)
-			} else if i == 2 && oracles[i-1] != nil {
-				msg = append(msg, oracles[i-1].ToBytes(account.Ergo)...)
-			} else if i > 2 {
-				msg = append(msg, defaultPK...)
-			}
+			msg = append(msg, DefaultConsulByte...)
 			continue
 		}
 		msg = append(msg, v.ToBytes(account.Ergo)...)
 	}
 
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(roundId))
+	msg = append(msg, b...)
+
 	sign, err := adaptor.Sign(msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return sign, err
+}
+func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, round int64, sender account.OraclesPubKey) ([]byte, error) {
+	var stringOracles []byte
+
+	for _, v := range oracles {
+		if v == nil {
+			stringOracles = append(stringOracles, defaultPK...)
+			continue
+		}
+		stringOracles = append(stringOracles, v.ToBytes(account.Ergo)...)
+	}
+
+	sign, err := adaptor.Sign(stringOracles)
 	if err != nil {
 		return nil, err
 	}
@@ -780,7 +705,7 @@ func (adaptor *ErgoAdaptor) SignOracles(nebulaId account.NebulaId, oracles []*ac
 
 func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.Context) (uint64, error) {
 	type Result struct {
-		Success bool   `json:"success"`
+		Success bool  `json:"success"`
 		PulseId int64 `json:"lastPulseId"`
 	}
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/getLastPulseId")
@@ -806,7 +731,6 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 		Success   bool  `json:"success"`
 		LastRound int64 `json:"lastRound"`
 	}
-	// zap.L().Sugar().Debugf("\t\tLastRound\t\t")
 
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
@@ -821,7 +745,6 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	// zap.L().Sugar().Debugf("LastRound: %v\n", result)
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}

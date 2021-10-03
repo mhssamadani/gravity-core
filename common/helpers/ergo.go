@@ -116,9 +116,6 @@ func (a ErgClient) GetOptions() ErgOptions {
 	return a.Options
 }
 
-//func withContext(ctx context.Context, req *http.Request) *http.Request {
-//	return req.WithContext(ctx)
-//}
 
 func newResponse(response *http.Response) *Response {
 	return &Response{
