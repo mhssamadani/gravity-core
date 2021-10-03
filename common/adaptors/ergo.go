@@ -230,11 +230,10 @@ func (adaptor *ErgoAdaptor) Sign(msg []byte) ([]byte, error) {
 	}
 	values := map[string]string{"msg": hex.EncodeToString(msg), "sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
-	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "height")
+	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "sign")
 	if err != nil {
 		return nil, err
 	}
-
 	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
 	if err != nil {
 		return nil, err
@@ -266,28 +265,28 @@ func (adaptor *ErgoAdaptor) PubKey() account.OraclesPubKey {
 		Address string `json:"address"`
 		Pk      string `json:"pk"`
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	values := map[string]string{"sk": hex.EncodeToString(adaptor.secret)}
 	jsonValue, _ := json.Marshal(values)
 	url, _ := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "getAddressDetail")
-	res, err := http.Post(url.String(), "application/json", bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		panic(err)
 	}
-	response, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		panic(err)
-	}
-	var responseObject Response
-	err = json.Unmarshal(response, &responseObject)
+	res := new(Response)
+	_, err = adaptor.ergoClient.Do(ctx, req, res)
 	if err != nil {
 		panic(err)
 	}
 
-	if !responseObject.Status {
+	if !res.Status {
 		err = fmt.Errorf("proxy connection problem")
 		panic(err)
 	}
-	oraclePubKey := account.BytesToOraclePubKey([]byte(responseObject.Pk), account.Ergo)
+	pk, _ := hex.DecodeString(res.Pk)
+	oraclePubKey := account.BytesToOraclePubKey(pk[:], account.Ergo)
 	return oraclePubKey
 }
 
@@ -411,7 +410,7 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 
 	switch SubType(dataType) {
 	case Int64:
-		v , err := strconv.ParseInt(value.Value, 10, 64)
+		v, err := strconv.ParseInt(value.Value, 10, 64)
 		if err != nil {
 			return err
 		}
@@ -433,14 +432,14 @@ func (adaptor *ErgoAdaptor) SendValueToSubs(nebulaId account.NebulaId, pulseId u
 	}
 	req, err := http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(jsonData))
 	if err != nil {
-		return  err
+		return err
 	}
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
 	if err != nil {
 		return err
 	}
-	return  nil
+	return nil
 }
 
 func (adaptor *ErgoAdaptor) SetOraclesToNebula(nebulaId account.NebulaId, oracles []*account.OraclesPubKey, signs map[account.OraclesPubKey][]byte, round int64, ctx context.Context) (string, error) {
@@ -549,14 +548,14 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	}
 	type Consuls struct {
 		Success bool     `json:"success"`
-		consuls []string `json:"consuls"`
+		Consuls []string `json:"consuls"`
 	}
 	type Sign struct {
 		a [5]string
 		z [5]string
 	}
 	type Data struct {
-		newConsuls []string `json:"newConsuls"`
+		NewConsuls []string `json:"newConsuls"`
 		Signs      Sign     `json:"signs"`
 	}
 
@@ -582,7 +581,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	if !result.Success {
 		return "", errors.New("can't get consuls")
 	} else {
-		consuls = result.consuls
+		consuls = result.Consuls
 	}
 
 	for k, sign := range signs {
@@ -631,7 +630,7 @@ func (adaptor *ErgoAdaptor) SendConsulsToGravityContract(newConsulsAddresses []*
 	if err != nil {
 		return "", err
 	}
-	data, err := json.Marshal(Data{newConsuls: newConsulsString, Signs: Sign{a: signsA, z: signsZ}})
+	data, err := json.Marshal(Data{NewConsuls: newConsulsString, Signs: Sign{a: signsA, z: signsZ}})
 	req, err = http.NewRequestWithContext(ctx, "POST", url.String(), bytes.NewBuffer(data))
 	tx := new(Tx)
 	_, err = adaptor.ergoClient.Do(ctx, req, tx)
@@ -706,8 +705,8 @@ func (adaptor *ErgoAdaptor) LastPulseId(nebulaId account.NebulaId, ctx context.C
 
 func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	type Result struct {
-		Success   bool   `json:"success"`
-		LastRound string `json:"lastRound"`
+		Success   bool  `json:"success"`
+		LastRound int64 `json:"lastRound"`
 	}
 	url, err := helpers.JoinUrl(adaptor.ergoClient.Options.BaseUrl, "adaptor/lastRound")
 	if err != nil {
@@ -725,8 +724,7 @@ func (adaptor *ErgoAdaptor) LastRound(ctx context.Context) (uint64, error) {
 	if !result.Success {
 		return 0, errors.New("can't get lastRound")
 	}
-	lastRound, _ := strconv.ParseUint(result.LastRound, 10, 64)
-	return lastRound, nil
+	return uint64(result.LastRound), nil
 }
 
 func (adaptor *ErgoAdaptor) RoundExist(roundId int64, ctx context.Context) (bool, error) {
